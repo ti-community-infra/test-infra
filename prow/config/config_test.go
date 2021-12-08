@@ -3494,6 +3494,10 @@ func TestRerunAuthConfigsGetRerunAuthConfig(t *testing.T) {
 }
 
 func TestMergeCommitTemplateLoading(t *testing.T) {
+	funcMap := template.FuncMap{
+		"compile": regexp.Compile,
+	}
+
 	var testCases = []struct {
 		name        string
 		prowConfig  string
@@ -3532,8 +3536,8 @@ tide:
 				"kubernetes/ingress": {
 					TitleTemplate: "{{ .Title }}",
 					BodyTemplate:  "{{ .Body }}",
-					Title:         template.Must(template.New("CommitTitle").Parse("{{ .Title }}")),
-					Body:          template.Must(template.New("CommitBody").Parse("{{ .Body }}")),
+					Title:         template.Must(template.New("CommitTitle").Funcs(funcMap).Parse("{{ .Title }}")),
+					Body:          template.Must(template.New("CommitBody").Funcs(funcMap).Parse("{{ .Body }}")),
 				},
 			},
 		},
@@ -3549,7 +3553,7 @@ tide:
 				"kubernetes/ingress": {
 					TitleTemplate: "{{ .Title }}",
 					BodyTemplate:  "",
-					Title:         template.Must(template.New("CommitTitle").Parse("{{ .Title }}")),
+					Title:         template.Must(template.New("CommitTitle").Funcs(funcMap).Parse("{{ .Title }}")),
 					Body:          nil,
 				},
 			},
@@ -3567,7 +3571,7 @@ tide:
 					TitleTemplate: "",
 					BodyTemplate:  "{{ .Body }}",
 					Title:         nil,
-					Body:          template.Must(template.New("CommitBody").Parse("{{ .Body }}")),
+					Body:          template.Must(template.New("CommitBody").Funcs(funcMap).Parse("{{ .Body }}")),
 				},
 			},
 		},
@@ -3614,7 +3618,7 @@ tide:
 		}
 
 		if err == nil {
-			if !reflect.DeepEqual(cfg.Tide.MergeTemplate, tc.expect) {
+			if !cmp.Equal(cfg.Tide.MergeTemplate, tc.expect, cmpopts.IgnoreTypes(template.Template{})) {
 				t.Errorf("tc %s: expected %#v\n!=\nactual %#v", tc.name, tc.expect, cfg.Tide.MergeTemplate)
 			}
 		}

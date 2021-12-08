@@ -1,0 +1,43 @@
+name: Unit Test
+
+on:
+  push:
+    branches:
+      - ti-community-custom
+  pull_request:
+    branches:
+      - ti-community-custom
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
+      - name: Setup Golang caches
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-golang-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-golang-
+
+      - name: Setup Bazel
+        uses: abhinavsingh/setup-bazel@v3
+        with:
+          version: 3.4.1
+
+      - name: Test
+        run: |
+          bazel test //prow/config:go_default_test
+          bazel test //prow/cmd/tide:go_default_test
+
+
