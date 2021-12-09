@@ -39,5 +39,5 @@ jobs:
         run: |
           bazel test //prow/config:go_default_test
           bazel test //prow/cmd/tide:go_default_test
-
+          bazel test //prow/cmd/checkconfig:go_default_test
 
