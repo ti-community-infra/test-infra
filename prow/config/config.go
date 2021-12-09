@@ -2274,7 +2274,7 @@ func parseProwConfig(c *Config) error {
 
 	for name, templates := range c.Tide.MergeTemplate {
 		funcMap := template.FuncMap{
-			"compile": regexp.Compile,
+			"regex": regexp.MustCompile,
 		}
 
 		if templates.TitleTemplate != "" {
