@@ -44,8 +44,6 @@ jobs:
     - name: Build
       env:
         PROW_REPO_OVERRIDE:  ${{ secrets.PROW_REPO_OVERRIDE }}
-        EDGE_PROW_REPO_OVERRIDE: ''
-        EDGE_PROW_REPO: ''
       run: |
         ./prow/push-tide.sh
 

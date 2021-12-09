@@ -59,7 +59,7 @@ gcloud auth configure-docker
 gcloud config get-value account || { echo "Debugging, ignore failure"; true; }
 
 # Build and push the current commit, failing on any uncommitted changes.
-new_version="v$(date -u '+%Y%m%d')-$(git describe --tags --always --dirty)"
+new_version="$(git describe --tags --always --dirty)"
 echo -e "version: $(color-version ${new_version})" >&2
 if [[ "${new_version}" == *-dirty ]]; then
   echo -e "$(color-error ERROR): uncommitted changes to repo" >&2
