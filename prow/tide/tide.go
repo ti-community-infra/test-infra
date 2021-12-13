@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -775,6 +776,72 @@ func toSimpleState(s prowapi.ProwJobState) simpleState {
 		return successState
 	}
 	return failureState
+}
+
+const (
+	issueNumberTextRegexp = "(?i)(?P<link_prefix>ref|close[sd]?|resolve[sd]?|fix(e[sd])?)\\s*(?:(https|http)://github\\.com/{{org}}/{{repo}}/issues/|#)(?P<issue_number>[1-9]\\d*)"
+	linkPrefixGroupName   = "link_prefix"
+	issueNumberGroupName  = "issue_number"
+	urlPartWildcard       = "[^/]+"
+	orgPlaceholder        = "{{org}}"
+	repoPlaceholder       = "{{repo}}"
+	defaultDelimiter      = ", "
+)
+
+func (pr PullRequest) Regexp(str string) *regexp.Regexp {
+	return regexp.MustCompile(str)
+}
+
+func (pr PullRequest) NormalizeIssueNumbers(content, org, repo, delimiter string) string {
+	regex := ""
+
+	// Whether specify the org in the link.
+	if len(org) == 0 {
+		regex = strings.ReplaceAll(issueNumberTextRegexp, orgPlaceholder, urlPartWildcard)
+	} else {
+		regex = strings.ReplaceAll(issueNumberTextRegexp, orgPlaceholder, org)
+	}
+	// Whether specify the repo in the link.
+	if len(repo) == 0 {
+		regex = strings.ReplaceAll(issueNumberTextRegexp, repoPlaceholder, urlPartWildcard)
+	} else {
+		regex = strings.ReplaceAll(issueNumberTextRegexp, repoPlaceholder, repo)
+	}
+
+	compile, err := regexp.Compile(regex)
+	if err != nil {
+		panic(fmt.Errorf("failed to compile the normalize regexp: %v", err))
+	}
+
+	allMatches := compile.FindAllStringSubmatch(content, -1)
+	groupNames := compile.SubexpNames()
+
+	issueNumbers := make([]string, 0)
+	for _, matches := range allMatches {
+		linkPrefix := ""
+		issueNumber := 0
+		for i, groupName := range groupNames {
+			if groupName == linkPrefixGroupName {
+				linkPrefix = matches[i]
+			}
+			if groupName == issueNumberGroupName {
+				issueNumber, err = strconv.Atoi(matches[i])
+				if err != nil {
+					panic(fmt.Errorf("failed to get issue number: %v", err))
+				}
+			}
+		}
+		issueNumbers = append(issueNumbers, fmt.Sprintf("%s #%d", linkPrefix, issueNumber))
+	}
+
+	result := ""
+	if len(delimiter) == 0 {
+		result = strings.Join(issueNumbers, defaultDelimiter)
+	} else {
+		result = strings.Join(issueNumbers, delimiter)
+	}
+
+	return result
 }
 
 // isPassingTests returns whether or not all contexts set on the PR except for

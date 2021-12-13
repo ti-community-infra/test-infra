@@ -3201,6 +3201,103 @@ func TestPrepareMergeDetails(t *testing.T) {
 			SHA:         "SHA",
 			MergeMethod: "merge",
 		},
+	}, {
+		name: "Commit template uses Regexp function",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $pattern := .Regexp "(?i)Issue Number:\\s*((,\\s*)?(ref|close[sd]?|resolve[sd]?|fix(e[sd])?)\\s*#(?P<issue_number>[1-9]\\d*))+" -}}
+				{{- $body := print .Body -}}
+				{{- $pattern.FindString $body -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Title:      "my commit title",
+			Body:       "\r\nIssue Number: close #2, ref #3\r\n",
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "Issue Number: close #2, ref #3",
+		},
+	}, {
+		name: "Commit template uses NormalizeIssueNumbers function",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $body := print .Body -}}
+				{{- .NormalizeIssueNumbers $body "" "" "" -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Title:      "my commit title",
+			Body:       "close #1\r\nIssue Number: close #2, ref #3\r\nref #4",
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "close #1, close #2, ref #3, ref #4",
+		},
+	}, {
+		name: "Commit template uses Regexp and NormalizeIssueNumbers function",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
+				{{- $body := print .Body -}}
+				{{- $issueNumberLine := $pattern.FindString $body -}}
+				{{- .NormalizeIssueNumbers $issueNumberLine "" "" "" -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Title:      "my commit title",
+			Body:       "close #1\r\nIssue Number: close #2, ref #3\r\nref #4",
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "close #2, ref #3",
+		},
+	}, {
+		name: "Commit template uses Regexp and NormalizeIssueNumbers function",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
+				{{- $body := print .Body -}}
+				{{- $issueNumberLine := $pattern.FindString $body -}}
+				{{- .NormalizeIssueNumbers $issueNumberLine "" "" "" -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Title:      "my commit title",
+			Body:       "foo",
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "",
+		},
 	}}
 
 	for _, test := range testCases {
