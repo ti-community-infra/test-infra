@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -3122,11 +3121,7 @@ func TestPresubmitsByPull(t *testing.T) {
 }
 
 func getTemplate(name, tplStr string) *template.Template {
-	funcMap := template.FuncMap{
-		"regex": regexp.MustCompile,
-	}
-
-	tpl, _ := template.New(name).Funcs(funcMap).Parse(tplStr)
+	tpl, _ := template.New(name).Parse(tplStr)
 	return tpl
 }
 
@@ -3205,30 +3200,6 @@ func TestPrepareMergeDetails(t *testing.T) {
 		expected: github.MergeDetails{
 			SHA:         "SHA",
 			MergeMethod: "merge",
-		},
-	}, {
-		name: "Commit template uses regex function",
-		tpl: config.TideMergeCommitTemplate{
-			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
-			Body: getTemplate("CommitBody", `
-				{{- $pattern := regex "(?i)Issue Number:\\s*((,\\s*)?(ref|close[sd]?|resolve[sd]?|fix(e[sd])?)\\s*#(?P<issue_number>[1-9]\\d*))+" -}}
-				{{- $body := print .Body -}}
-				{{- $pattern.FindString $body -}}
-			`),
-		},
-		pr: PullRequest{
-			Number:     githubql.Int(1),
-			Mergeable:  githubql.MergeableStateMergeable,
-			HeadRefOID: githubql.String("SHA"),
-			Title:      "my commit title",
-			Body:       "\r\nIssue Number: close #2, ref #3\r\n",
-		},
-		mergeMethod: "merge",
-		expected: github.MergeDetails{
-			SHA:           "SHA",
-			MergeMethod:   "merge",
-			CommitTitle:   "my commit title (#1)",
-			CommitMessage: "Issue Number: close #2, ref #3",
 		},
 	}}
 
