@@ -23,7 +23,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -66,7 +66,7 @@ presubmits:
       test.kops.k8s.io/k8s_version: stable
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: amazonvpc
-      testgrid-dashboards: kops-distro-u2004, kops-k8s-stable, kops-network-plugins, kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
+      testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-amazonvpc
 
@@ -89,7 +89,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -136,7 +136,7 @@ presubmits:
       test.kops.k8s.io/k8s_version: ci
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: amazonvpc
-      testgrid-dashboards: kops-distro-deb11, kops-ipv6, kops-k8s-ci, kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
+      testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-amazonvpc-ipv6
 
@@ -160,7 +160,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -203,7 +203,7 @@ presubmits:
       test.kops.k8s.io/k8s_version: stable
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: calico
-      testgrid-dashboards: kops-distro-u2004, kops-k8s-stable, kops-network-plugins, kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
+      testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-calico
 
@@ -227,7 +227,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -274,7 +274,7 @@ presubmits:
       test.kops.k8s.io/k8s_version: ci
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: calico
-      testgrid-dashboards: kops-distro-deb11, kops-ipv6, kops-k8s-ci, kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
+      testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-calico-ipv6
 
@@ -298,7 +298,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -341,7 +341,7 @@ presubmits:
       test.kops.k8s.io/k8s_version: stable
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: canal
-      testgrid-dashboards: kops-distro-u2004, kops-k8s-stable, kops-network-plugins, kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
+      testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-canal
 
@@ -365,7 +365,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -408,7 +408,7 @@ presubmits:
       test.kops.k8s.io/k8s_version: stable
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: cilium
-      testgrid-dashboards: kops-distro-u2004, kops-k8s-stable, kops-network-plugins, kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
+      testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-cilium
 
@@ -432,7 +432,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -479,7 +479,7 @@ presubmits:
       test.kops.k8s.io/k8s_version: ci
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: cilium
-      testgrid-dashboards: kops-distro-deb11, kops-ipv6, kops-k8s-ci, kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
+      testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-cilium-ipv6
 
@@ -502,7 +502,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -545,7 +545,7 @@ presubmits:
       test.kops.k8s.io/k8s_version: stable
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: cilium-etcd
-      testgrid-dashboards: kops-distro-u2004, kops-k8s-stable, kops-network-plugins, kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
+      testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-cilium-etcd
 
@@ -569,7 +569,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -612,7 +612,7 @@ presubmits:
       test.kops.k8s.io/k8s_version: stable
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: flannel
-      testgrid-dashboards: kops-distro-u2004, kops-k8s-stable, kops-network-plugins, kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
+      testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-flannel
 
@@ -636,7 +636,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -679,11 +679,11 @@ presubmits:
       test.kops.k8s.io/k8s_version: stable
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: kube-router
-      testgrid-dashboards: kops-distro-u2004, kops-k8s-stable, kops-network-plugins, kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
+      testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-kuberouter
 
-# {"cloud": "aws", "container_runtime": "containerd", "distro": "u2004", "extra_flags": "--node-size=t3.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "weave"}
+# {"cloud": "aws", "container_runtime": "containerd", "distro": "u2004", "extra_flags": "--node-size=t3.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "1.22", "kops_channel": "alpha", "networking": "weave"}
   - name: pull-kops-e2e-cni-weave
     branches:
     - master
@@ -703,7 +703,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -717,13 +717,13 @@ presubmits:
             --up --build --down \
             --cloud-provider=aws \
             --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20211129' --channel=alpha --networking=weave --container-runtime=containerd --node-size=t3.large --discovery-store=s3://k8s-kops-prow/discovery" \
-            --kubernetes-version=https://storage.googleapis.com/kubernetes-release/release/stable.txt \
+            --kubernetes-version=https://storage.googleapis.com/kubernetes-release/release/stable-1.22.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/bazel-bin/cmd/kops/linux-amd64/kops \
             --test=kops \
             -- \
             --ginkgo-args="--debug" \
             --test-args="-test.timeout=60m -num-nodes=0" \
-            --test-package-marker=stable.txt \
+            --test-package-marker=stable-1.22.txt \
             --parallel=25
         securityContext:
           privileged: true
@@ -743,9 +743,9 @@ presubmits:
       test.kops.k8s.io/container_runtime: containerd
       test.kops.k8s.io/distro: u2004
       test.kops.k8s.io/extra_flags: --node-size=t3.large --discovery-store=s3://k8s-kops-prow/discovery
-      test.kops.k8s.io/k8s_version: stable
+      test.kops.k8s.io/k8s_version: '1.22'
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: weave
-      testgrid-dashboards: kops-distro-u2004, kops-k8s-stable, kops-network-plugins, kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
+      testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-weave

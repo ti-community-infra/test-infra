@@ -33,7 +33,7 @@ from helpers import ( # pylint: disable=import-error, no-name-in-module
 skip_jobs = [
 ]
 
-image = "gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master"
+image = "gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master"
 
 ##############
 # Build Test #
@@ -317,8 +317,6 @@ def presubmit_test(branch='master',
         'presubmits-kops',
         'kops-presubmits',
         'sig-cluster-lifecycle-kops',
-        f"kops-distro-{distro}",
-        f"kops-k8s-{k8s_version or 'latest'}",
     ]
     if extra_dashboards:
         dashboards.extend(extra_dashboards)
@@ -364,7 +362,6 @@ distro_options = [
 
 k8s_versions = [
     #"latest", # disabled until we're ready to test 1.23
-    "1.20",
     "1.21",
     "1.22",
     "1.23"
@@ -373,7 +370,8 @@ k8s_versions = [
 kops_versions = [
     None, # maps to latest
     "1.21",
-    "1.22"
+    "1.22",
+    "1.23"
 ]
 
 container_runtimes = [
@@ -737,9 +735,12 @@ def generate_network_plugins():
     results = []
     for plugin in plugins:
         networking_arg = plugin.replace('amazon-vpc', 'amazonvpc').replace('kuberouter', 'kube-router') # pylint: disable=line-too-long
+        k8s_version = 'stable'
+        if plugin == 'weave':
+            k8s_version = '1.22'
         results.append(
             build_test(
-                k8s_version='stable',
+                k8s_version=k8s_version,
                 kops_channel='alpha',
                 name_override=f"kops-aws-cni-{plugin}",
                 networking=networking_arg,
@@ -756,13 +757,14 @@ def generate_network_plugins():
 def generate_upgrades():
     versions_list = [
         #  kops    k8s          kops      k8s
-        (('1.21', 'v1.21.7'), ('latest', 'latest')),
-        (('1.22', 'v1.22.4'), ('latest', 'latest')),
-        (('1.21', 'v1.21.7'), ('1.22', 'v1.22.4')),
-        (('1.20', 'v1.20.13'), ('1.21', 'v1.21.7')),
+        (('1.22', 'v1.22.4'), ('1.23', 'v1.23.0')),
+        (('1.22', 'v1.22.4'), ('latest', '1.23.0')),
+        (('1.23', 'v1.23.0'), ('latest', 'latest')),
+        (('latest', 'v1.23.0'), ('latest', 'latest')),
+        (('latest', 'v1.22.4'), ('latest', 'v1.23.0')),
+        (('latest', 'v1.21.7'), ('latest', 'v1.22.4')),
         (('latest', 'v1.20.6'), ('latest', 'v1.21.7')),
-        (('latest', 'v1.18.20'), ('latest', 'v1.19.16')),
-        (('1.20', 'v1.20.13'), ('latest', 'v1.21.7')),
+        (('latest', 'v1.19.16'), ('latest', 'v1.20.6')),
     ]
     def shorten(version):
         version = re.sub(r'^v', '', version)
@@ -833,7 +835,7 @@ def generate_versions():
 ######################
 def generate_pipeline():
     results = []
-    for version in ['master', '1.22', '1.21', '1.20']:
+    for version in ['master', '1.23', '1.22', '1.21']:
         branch = version if version == 'master' else f"release-{version}"
         publish_version_marker = f"gs://kops-ci/markers/{branch}/latest-ci-updown-green.txt"
         kops_version = f"https://storage.googleapis.com/k8s-staging-kops/kops/releases/markers/{branch}/latest-ci.txt" # pylint: disable=line-too-long
@@ -874,15 +876,17 @@ def generate_presubmits_network_plugins():
         networking_arg = plugin
         if plugin == 'kuberouter':
             networking_arg = 'kube-router'
+        k8s_version = 'stable'
+        if plugin == 'weave':
+            k8s_version = '1.22'
         results.append(
             presubmit_test(
-                k8s_version='stable',
+                k8s_version=k8s_version,
                 kops_channel='alpha',
                 name=f"pull-kops-e2e-cni-{plugin}",
                 tab_name=f"e2e-{plugin}",
                 networking=networking_arg,
                 extra_flags=['--node-size=t3.large'],
-                extra_dashboards=['kops-network-plugins'],
                 run_if_changed=run_if_changed,
             )
         )
@@ -900,7 +904,6 @@ def generate_presubmits_network_plugins():
                     extra_flags=['--ipv6',
                                  '--zones=us-west-2a',
                                  ],
-                    extra_dashboards=['kops-ipv6'],
                     run_if_changed=run_if_changed,
                 )
             )
@@ -1085,6 +1088,16 @@ def generate_presubmits_e2e():
                          "--master-size=m6g.large"],
         ),
 
+        presubmit_test(
+            branch='release-1.23',
+            k8s_version='1.23',
+            kops_channel='alpha',
+            name='pull-kops-e2e-kubernetes-aws-1-23',
+            networking='calico',
+            tab_name='e2e-1-23',
+            always_run=True,
+            skip_regex=skip_regex,
+        ),
         presubmit_test(
             branch='release-1.22',
             k8s_version='1.22',

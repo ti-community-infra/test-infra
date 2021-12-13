@@ -130,12 +130,13 @@ postsubmits:
     spec:
       serviceAccountName: deployer
       containers:
-      - image: gcr.io/k8s-testimages/gcloud-bazel:v20210128-v0.6-11-gf1c6399
+      - image: gcr.io/k8s-staging-test-infra/gcloud-in-go:v20211210-cf89952124
         command:
-        - prow/deploy.sh
+        - make
         args:
-        - --confirm
-        - --config=trusted
+        - -C
+        - config/prow
+        - deploy-all
     annotations:
       testgrid-dashboards: sig-testing-prow
       testgrid-tab-name: deploy-prow
@@ -151,7 +152,7 @@ postsubmits:
     max_concurrency: 1
     spec:
       containers:
-      - image: gcr.io/k8s-prow/hmac:v20211207-16e4d57ac1
+      - image: gcr.io/k8s-prow/hmac:v20211210-dfd4c4dd7d
         command:
         - /hmac
         args:
@@ -612,7 +613,7 @@ periodics:
     base_ref: master
   spec:
     containers:
-    - image: gcr.io/k8s-prow/generic-autobumper:v20211207-16e4d57ac1
+    - image: gcr.io/k8s-prow/generic-autobumper:v20211210-dfd4c4dd7d
       command:
       - /app/prow/cmd/generic-autobumper/app.binary
       args:
@@ -649,7 +650,7 @@ periodics:
     base_ref: master
   spec:
     containers:
-    - image: gcr.io/k8s-prow/generic-autobumper:v20211207-16e4d57ac1
+    - image: gcr.io/k8s-prow/generic-autobumper:v20211210-dfd4c4dd7d
       command:
       - /app/prow/cmd/generic-autobumper/app.binary
       args:
@@ -720,7 +721,7 @@ periodics:
   spec:
     containers:
     - name: branchprotector
-      image: gcr.io/k8s-prow/branchprotector:v20211207-16e4d57ac1
+      image: gcr.io/k8s-prow/branchprotector:v20211210-dfd4c4dd7d
       command:
       - /app/prow/cmd/branchprotector/app.binary
       args:
@@ -754,7 +755,7 @@ periodics:
   spec:
     containers:
     - name: label-sync
-      image: gcr.io/k8s-prow/label_sync:v20211207-16e4d57ac1
+      image: gcr.io/k8s-prow/label_sync:v20211210-dfd4c4dd7d
       command:
       - /app/label_sync/app.binary
       args:
@@ -800,7 +801,7 @@ periodics:
     base_ref: master
   spec:
     containers:
-    - image: gcr.io/k8s-prow/checkconfig:v20211207-16e4d57ac1
+    - image: gcr.io/k8s-prow/checkconfig:v20211210-dfd4c4dd7d
       command:
       - /checkconfig
       args:

@@ -8,7 +8,7 @@ presubmits:
     run_if_changed: 'azure.*\.go'
     path_alias: k8s.io/kubernetes
     branches:
-      - release-1.19
+      - release-1.23
     labels:
       preset-dind-enabled: "true"
       preset-kind-volume-mounts: "true"
@@ -26,7 +26,7 @@ presubmits:
         path_alias: sigs.k8s.io/azuredisk-csi-driver
     spec:
       containers:
-        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
           command:
             - runner.sh
             - ./scripts/ci-entrypoint.sh
@@ -34,7 +34,7 @@ presubmits:
             - bash
             - -c
             - >-
-              cd ${GOPATH}/src/sigs.k8s.io/azuredisk-csi-driver &&
+              cd ${GOPATH}/src/sigs.k8s.io/azuredisk-csi-driver && ./deploy/install-driver.sh master local,snapshot,enable-avset &&
               make e2e-test
           env:
             - name: AZURE_STORAGE_DRIVER
@@ -53,7 +53,7 @@ presubmits:
     run_if_changed: 'azure.*\.go'
     path_alias: k8s.io/kubernetes
     branches:
-      - release-1.19
+      - release-1.23
     labels:
       preset-dind-enabled: "true"
       preset-kind-volume-mounts: "true"
@@ -71,7 +71,7 @@ presubmits:
         path_alias: sigs.k8s.io/azuredisk-csi-driver
     spec:
       containers:
-        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
           command:
             - runner.sh
             - ./scripts/ci-entrypoint.sh
@@ -79,7 +79,7 @@ presubmits:
             - bash
             - -c
             - >-
-              cd ${GOPATH}/src/sigs.k8s.io/azuredisk-csi-driver &&
+              cd ${GOPATH}/src/sigs.k8s.io/azuredisk-csi-driver && ./deploy/install-driver.sh master local,snapshot,enable-avset &&
               make e2e-test
           env:
             - name: AZURE_STORAGE_DRIVER
@@ -100,7 +100,7 @@ presubmits:
     run_if_changed: 'azure.*\.go'
     path_alias: k8s.io/kubernetes
     branches:
-      - release-1.19
+      - release-1.23
     labels:
       preset-dind-enabled: "true"
       preset-kind-volume-mounts: "true"
@@ -118,7 +118,7 @@ presubmits:
         path_alias: sigs.k8s.io/azurefile-csi-driver
     spec:
       containers:
-        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
           command:
             - runner.sh
             - ./scripts/ci-entrypoint.sh
@@ -127,7 +127,7 @@ presubmits:
             - -c
             - >-
               kubectl apply -f templates/addons/azurefile-role.yaml &&
-              cd ${GOPATH}/src/sigs.k8s.io/azurefile-csi-driver &&
+              cd ${GOPATH}/src/sigs.k8s.io/azurefile-csi-driver && ./deploy/install-driver.sh master local,snapshot,enable-avset &&
               make e2e-test
           env:
             - name: AZURE_STORAGE_DRIVER
@@ -146,7 +146,7 @@ presubmits:
     run_if_changed: 'azure.*\.go'
     path_alias: k8s.io/kubernetes
     branches:
-      - release-1.19
+      - release-1.23
     labels:
       preset-dind-enabled: "true"
       preset-kind-volume-mounts: "true"
@@ -164,7 +164,7 @@ presubmits:
         path_alias: sigs.k8s.io/azurefile-csi-driver
     spec:
       containers:
-        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
           command:
             - runner.sh
             - ./scripts/ci-entrypoint.sh
@@ -173,7 +173,7 @@ presubmits:
             - -c
             - >-
               kubectl apply -f templates/addons/azurefile-role.yaml &&
-              cd ${GOPATH}/src/sigs.k8s.io/azurefile-csi-driver &&
+              cd ${GOPATH}/src/sigs.k8s.io/azurefile-csi-driver && ./deploy/install-driver.sh master local,snapshot,enable-avset &&
               make e2e-test
           env:
             - name: AZURE_STORAGE_DRIVER
@@ -194,7 +194,7 @@ presubmits:
     run_if_changed: 'azure.*\.go'
     path_alias: k8s.io/kubernetes
     branches:
-      - release-1.19
+      - release-1.23
     labels:
       preset-dind-enabled: "true"
       preset-kind-volume-mounts: "true"
@@ -208,7 +208,7 @@ presubmits:
       workdir: true
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         command:
         - runner.sh
         - ./scripts/ci-conformance.sh
@@ -232,7 +232,7 @@ presubmits:
     optional: true
     path_alias: k8s.io/kubernetes
     branches:
-      - release-1.19
+      - release-1.23
     labels:
       preset-dind-enabled: "true"
       preset-kind-volume-mounts: "true"
@@ -246,7 +246,7 @@ presubmits:
       workdir: true
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
         command:
         - runner.sh
         - ./scripts/ci-conformance.sh
@@ -266,7 +266,7 @@ presubmits:
 
 periodics:
 - interval: 3h
-  name: capz-conformance-1-19
+  name: capz-conformance-1-23
   decorate: true
   decoration_config:
     timeout: 3h
@@ -281,7 +281,7 @@ periodics:
     path_alias: sigs.k8s.io/cluster-api-provider-azure
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
       command:
       - runner.sh
       - ./scripts/ci-conformance.sh
@@ -289,7 +289,7 @@ periodics:
       - name: E2E_ARGS
         value: "-kubetest.use-ci-artifacts"
       - name: KUBERNETES_VERSION
-        value: "latest-1.19"
+        value: "latest-1.23"
       - name: CONFORMANCE_WORKER_MACHINE_COUNT
         value: "2"
       securityContext:
@@ -299,13 +299,13 @@ periodics:
           cpu: 1
           memory: "4Gi"
   annotations:
-    testgrid-dashboards: provider-azure-1.19-signal
+    testgrid-dashboards: provider-azure-1.23-signal
     testgrid-tab-name: capz-conformance
     testgrid-alert-email: kubernetes-provider-azure@googlegroups.com
     testgrid-num-columns-recent: '30'
 
 - interval: 24h
-  name: capz-azure-file-1-19
+  name: capz-azure-file-1-23
   decorate: true
   decoration_config:
     timeout: 3h
@@ -324,11 +324,11 @@ periodics:
     path_alias: sigs.k8s.io/azurefile-csi-driver
   - org: kubernetes
     repo: kubernetes
-    base_ref: release-1.19
+    base_ref: release-1.23
     path_alias: k8s.io/kubernetes
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
       command:
       - runner.sh
       - ./scripts/ci-entrypoint.sh
@@ -337,7 +337,7 @@ periodics:
       - -c
       - >-
         kubectl apply -f templates/addons/azurefile-role.yaml &&
-        cd ${GOPATH}/src/sigs.k8s.io/azurefile-csi-driver &&
+        cd ${GOPATH}/src/sigs.k8s.io/azurefile-csi-driver && ./deploy/install-driver.sh master local,snapshot,enable-avset &&
         make e2e-test
       env:
       - name: USE_CI_ARTIFACTS
@@ -351,13 +351,13 @@ periodics:
           cpu: 1
           memory: "4Gi"
   annotations:
-    testgrid-dashboards: provider-azure-1.19-signal
+    testgrid-dashboards: provider-azure-1.23-signal
     testgrid-tab-name: capz-azure-file
     testgrid-alert-email: kubernetes-provider-azure@googlegroups.com
     testgrid-num-columns-recent: '30'
 
 - interval: 24h
-  name: capz-azure-file-vmss-1-19
+  name: capz-azure-file-vmss-1-23
   decorate: true
   decoration_config:
     timeout: 3h
@@ -376,11 +376,11 @@ periodics:
     path_alias: sigs.k8s.io/azurefile-csi-driver
   - org: kubernetes
     repo: kubernetes
-    base_ref: release-1.19
+    base_ref: release-1.23
     path_alias: k8s.io/kubernetes
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
       command:
       - runner.sh
       - ./scripts/ci-entrypoint.sh
@@ -389,7 +389,7 @@ periodics:
       - -c
       - >-
         kubectl apply -f templates/addons/azurefile-role.yaml &&
-        cd ${GOPATH}/src/sigs.k8s.io/azurefile-csi-driver &&
+        cd ${GOPATH}/src/sigs.k8s.io/azurefile-csi-driver && ./deploy/install-driver.sh master local,snapshot,enable-avset &&
         make e2e-test
       env:
       - name: USE_CI_ARTIFACTS
@@ -405,13 +405,13 @@ periodics:
           cpu: 1
           memory: "4Gi"
   annotations:
-    testgrid-dashboards: provider-azure-1.19-signal
+    testgrid-dashboards: provider-azure-1.23-signal
     testgrid-tab-name: capz-azure-file-vmss
     testgrid-alert-email: kubernetes-provider-azure@googlegroups.com
     testgrid-num-columns-recent: '30'
 
 - interval: 24h
-  name: capz-azure-disk-1-19
+  name: capz-azure-disk-1-23
   decorate: true
   decoration_config:
     timeout: 3h
@@ -430,11 +430,11 @@ periodics:
     path_alias: sigs.k8s.io/azuredisk-csi-driver
   - org: kubernetes
     repo: kubernetes
-    base_ref: release-1.19
+    base_ref: release-1.23
     path_alias: k8s.io/kubernetes
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
       command:
       - runner.sh
       - ./scripts/ci-entrypoint.sh
@@ -442,7 +442,7 @@ periodics:
       - bash
       - -c
       - >-
-        cd ${GOPATH}/src/sigs.k8s.io/azuredisk-csi-driver &&
+        cd ${GOPATH}/src/sigs.k8s.io/azuredisk-csi-driver && ./deploy/install-driver.sh master local,snapshot,enable-avset &&
         make e2e-test
       env:
       - name: USE_CI_ARTIFACTS
@@ -456,13 +456,13 @@ periodics:
           cpu: 1
           memory: "4Gi"
   annotations:
-    testgrid-dashboards: provider-azure-1.19-signal
+    testgrid-dashboards: provider-azure-1.23-signal
     testgrid-tab-name: capz-azure-disk
     testgrid-alert-email: kubernetes-provider-azure@googlegroups.com
     testgrid-num-columns-recent: '30'
 
 - interval: 24h
-  name: capz-azure-disk-vmss-1-19
+  name: capz-azure-disk-vmss-1-23
   decorate: true
   decoration_config:
     timeout: 3h
@@ -481,11 +481,11 @@ periodics:
     path_alias: sigs.k8s.io/azuredisk-csi-driver
   - org: kubernetes
     repo: kubernetes
-    base_ref: release-1.19
+    base_ref: release-1.23
     path_alias: k8s.io/kubernetes
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211124-2ed05120f3-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master
       command:
       - runner.sh
       - ./scripts/ci-entrypoint.sh
@@ -493,7 +493,7 @@ periodics:
       - bash
       - -c
       - >-
-        cd ${GOPATH}/src/sigs.k8s.io/azuredisk-csi-driver &&
+        cd ${GOPATH}/src/sigs.k8s.io/azuredisk-csi-driver && ./deploy/install-driver.sh master local,snapshot,enable-avset &&
         make e2e-test
       env:
       - name: USE_CI_ARTIFACTS
@@ -509,7 +509,7 @@ periodics:
           cpu: 1
           memory: "4Gi"
   annotations:
-    testgrid-dashboards: provider-azure-1.19-signal
+    testgrid-dashboards: provider-azure-1.23-signal
     testgrid-tab-name: capz-azure-disk-vmss
     testgrid-alert-email: kubernetes-provider-azure@googlegroups.com
     testgrid-num-columns-recent: '30'
