@@ -30,6 +30,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-golang-
 
+      - name: Mount bazel cache
+        uses: actions/cache@v1
+        with:
+          path: "/home/runner/.cache/bazel"
+          key: bazel
+
       - name: Setup Bazel
         uses: abhinavsingh/setup-bazel@v3
         with:
