@@ -793,19 +793,19 @@ func (pr PullRequest) Regexp(str string) *regexp.Regexp {
 }
 
 func (pr PullRequest) NormalizeIssueNumbers(content, org, repo, delimiter string) string {
-	regex := ""
+	regex := issueNumberTextRegexp
 
 	// Whether specify the org in the link.
 	if len(org) == 0 {
-		regex = strings.ReplaceAll(issueNumberTextRegexp, orgPlaceholder, urlPartWildcard)
+		regex = strings.ReplaceAll(regex, orgPlaceholder, urlPartWildcard)
 	} else {
-		regex = strings.ReplaceAll(issueNumberTextRegexp, orgPlaceholder, org)
+		regex = strings.ReplaceAll(regex, orgPlaceholder, org)
 	}
 	// Whether specify the repo in the link.
 	if len(repo) == 0 {
-		regex = strings.ReplaceAll(issueNumberTextRegexp, repoPlaceholder, urlPartWildcard)
+		regex = strings.ReplaceAll(regex, repoPlaceholder, urlPartWildcard)
 	} else {
-		regex = strings.ReplaceAll(issueNumberTextRegexp, repoPlaceholder, repo)
+		regex = strings.ReplaceAll(regex, repoPlaceholder, repo)
 	}
 
 	compile, err := regexp.Compile(regex)

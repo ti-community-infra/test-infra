@@ -3274,7 +3274,57 @@ func TestPrepareMergeDetails(t *testing.T) {
 			CommitMessage: "close #2, ref #3",
 		},
 	}, {
-		name: "Commit template uses Regexp and NormalizeIssueNumbers function",
+		name: "Commit template uses NormalizeIssueNumbers function for issue link",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
+				{{- $body := print .Body -}}
+				{{- $issueNumberLine := $pattern.FindString $body -}}
+				{{- .NormalizeIssueNumbers $issueNumberLine "" "" "" -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Title:      "my commit title",
+			Body:       "close #1\r\nIssue Number: close #2, ref https://github.com/pingcap/tidb/issues/3\r\nref #4",
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "close #2, ref #3",
+		},
+	}, {
+		name: "Commit template uses NormalizeIssueNumbers function for issue link limit org and repo",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
+				{{- $body := print .Body -}}
+				{{- $issueNumberLine := $pattern.FindString $body -}}
+				{{- .NormalizeIssueNumbers $issueNumberLine "tikv" "tikv" "" -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Title:      "my commit title",
+			Body:       "close #1\r\nIssue Number: close #2, ref https://github.com/tikv/tikv/issues/3\r\nref #4",
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "close #2, ref #3",
+		},
+	}, {
+		name: "Commit template uses NormalizeIssueNumbers function for no-issue-number text",
 		tpl: config.TideMergeCommitTemplate{
 			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
 			Body: getTemplate("CommitBody", `
