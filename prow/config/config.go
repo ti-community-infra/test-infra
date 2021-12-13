@@ -2273,12 +2273,8 @@ func parseProwConfig(c *Config) error {
 	}
 
 	for name, templates := range c.Tide.MergeTemplate {
-		funcMap := template.FuncMap{
-			"compile": regexp.Compile,
-		}
-
 		if templates.TitleTemplate != "" {
-			titleTemplate, err := template.New("CommitTitle").Funcs(funcMap).Parse(templates.TitleTemplate)
+			titleTemplate, err := template.New("CommitTitle").Parse(templates.TitleTemplate)
 
 			if err != nil {
 				return fmt.Errorf("parsing template for commit title: %w", err)
@@ -2288,7 +2284,7 @@ func parseProwConfig(c *Config) error {
 		}
 
 		if templates.BodyTemplate != "" {
-			bodyTemplate, err := template.New("CommitBody").Funcs(funcMap).Parse(templates.BodyTemplate)
+			bodyTemplate, err := template.New("CommitBody").Parse(templates.BodyTemplate)
 
 			if err != nil {
 				return fmt.Errorf("parsing template for commit body: %w", err)
