@@ -3123,7 +3123,7 @@ func TestPresubmitsByPull(t *testing.T) {
 
 func getTemplate(name, tplStr string) *template.Template {
 	funcMap := template.FuncMap{
-		"regex": regexp.MustCompile,
+		"compile": regexp.Compile,
 	}
 
 	tpl, _ := template.New(name).Funcs(funcMap).Parse(tplStr)
@@ -3207,11 +3207,11 @@ func TestPrepareMergeDetails(t *testing.T) {
 			MergeMethod: "merge",
 		},
 	}, {
-		name: "Commit template uses regex function",
+		name: "Commit template uses compile function",
 		tpl: config.TideMergeCommitTemplate{
 			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
 			Body: getTemplate("CommitBody", `
-				{{- $pattern := regex "(?i)Issue Number:\\s*((,\\s*)?(ref|close[sd]?|resolve[sd]?|fix(e[sd])?)\\s*#(?P<issue_number>[1-9]\\d*))+" -}}
+				{{- $pattern := compile "(?i)Issue Number:\\s*((,\\s*)?(ref|close[sd]?|resolve[sd]?|fix(e[sd])?)\\s*#(?P<issue_number>[1-9]\\d*))+" -}}
 				{{- $body := print .Body -}}
 				{{- $pattern.FindString $body -}}
 			`),

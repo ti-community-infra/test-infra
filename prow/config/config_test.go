@@ -3495,7 +3495,7 @@ func TestRerunAuthConfigsGetRerunAuthConfig(t *testing.T) {
 
 func TestMergeCommitTemplateLoading(t *testing.T) {
 	funcMap := template.FuncMap{
-		"regex": regexp.MustCompile,
+		"compile": regexp.Compile,
 	}
 
 	var testCases = []struct {
