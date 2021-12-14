@@ -779,36 +779,28 @@ func toSimpleState(s prowapi.ProwJobState) simpleState {
 }
 
 const (
-	issueNumberTextRegexp = "(?i)(?P<link_prefix>ref|close[sd]?|resolve[sd]?|fix(e[sd])?)\\s*(?:(https|http)://github\\.com/{{org}}/{{repo}}/issues/|#)(?P<issue_number>[1-9]\\d*)"
-	linkPrefixGroupName   = "link_prefix"
-	issueNumberGroupName  = "issue_number"
-	urlPartWildcard       = "[^/]+"
-	orgPlaceholder        = "{{org}}"
-	repoPlaceholder       = "{{repo}}"
-	defaultDelimiter      = ", "
+	issueNumberBlockRegexp  = "(?i)%s\\s*%s(?P<issue_number>[1-9]\\d*)"
+	associatePrefixRegexp   = "(?P<associate_prefix>ref|close[sd]?|resolve[sd]?|fix(e[sd])?)"
+	issueNumberPrefixRegexp = "(?P<issue_number_prefix>(https|http)://github\\.com/[a-zA-Z0-9][a-zA-Z0-9-]{0,38}/[a-zA-Z0-9-_]{1,100}/issues/|[a-zA-Z0-9][a-zA-Z0-9-]{0,38}/[a-zA-Z0-9-_]{1,100}#|#)"
+	linkPrefixRegexp        = "(https|http)://github\\.com/(?P<org>[a-zA-Z0-9][a-zA-Z0-9-]{0,38})/(?P<repo>[a-zA-Z0-9-_]{1,100})/issues/"
+	fullPrefixRegexp        = "(?P<org>[a-zA-Z0-9][a-zA-Z0-9-]{0,38})/(?P<repo>[a-zA-Z0-9-_]{1,100})#"
+	shortPrefix             = "#"
+
+	associatePrefixGroupName   = "associate_prefix"
+	issueNumberPrefixGroupName = "issue_number_prefix"
+	issueNumberGroupName       = "issue_number"
+	orgGroupName               = "org"
+	repoGroupName              = "repo"
+	defaultDelimiter           = ", "
 )
 
 func (pr PullRequest) Regexp(str string) *regexp.Regexp {
 	return regexp.MustCompile(str)
 }
 
-func (pr PullRequest) NormalizeIssueNumbers(content, org, repo, delimiter string) string {
-	regex := issueNumberTextRegexp
-
-	// Whether specify the org in the link.
-	if len(org) == 0 {
-		regex = strings.ReplaceAll(regex, orgPlaceholder, urlPartWildcard)
-	} else {
-		regex = strings.ReplaceAll(regex, orgPlaceholder, org)
-	}
-	// Whether specify the repo in the link.
-	if len(repo) == 0 {
-		regex = strings.ReplaceAll(regex, repoPlaceholder, urlPartWildcard)
-	} else {
-		regex = strings.ReplaceAll(regex, repoPlaceholder, repo)
-	}
-
-	compile, err := regexp.Compile(regex)
+func (pr PullRequest) NormalizeIssueNumbers(content, currOrg, currRepo, delimiter string) string {
+	pattern := fmt.Sprintf(issueNumberBlockRegexp, associatePrefixRegexp, issueNumberPrefixRegexp)
+	compile, err := regexp.Compile(pattern)
 	if err != nil {
 		panic(fmt.Errorf("failed to compile the normalize regexp: %v", err))
 	}
@@ -818,20 +810,29 @@ func (pr PullRequest) NormalizeIssueNumbers(content, org, repo, delimiter string
 
 	issueNumbers := make([]string, 0)
 	for _, matches := range allMatches {
-		linkPrefix := ""
+		associatePrefix := ""
+		issueNumberPrefix := ""
 		issueNumber := 0
 		for i, groupName := range groupNames {
-			if groupName == linkPrefixGroupName {
-				linkPrefix = matches[i]
-			}
-			if groupName == issueNumberGroupName {
+			if groupName == associatePrefixGroupName {
+				associatePrefix = matches[i]
+			} else if groupName == issueNumberPrefixGroupName {
+				issueNumberPrefix = matches[i]
+			} else if groupName == issueNumberGroupName {
 				issueNumber, err = strconv.Atoi(matches[i])
 				if err != nil {
 					panic(fmt.Errorf("failed to get issue number: %v", err))
 				}
 			}
 		}
-		issueNumbers = append(issueNumbers, fmt.Sprintf("%s #%d", linkPrefix, issueNumber))
+
+		if b, org, repo := isLinkPrefix(issueNumberPrefix); b {
+			issueNumbers = append(issueNumbers, shortenPrefix(associatePrefix, org, repo, currOrg, currRepo, issueNumber))
+		} else if b, org, repo := isFullPrefix(issueNumberPrefix); b {
+			issueNumbers = append(issueNumbers, shortenPrefix(associatePrefix, org, repo, currOrg, currRepo, issueNumber))
+		} else if isShortPrefix(issueNumberPrefix) {
+			issueNumbers = append(issueNumbers, fmt.Sprintf("%s #%d", associatePrefix, issueNumber))
+		}
 	}
 
 	result := ""
@@ -842,6 +843,72 @@ func (pr PullRequest) NormalizeIssueNumbers(content, org, repo, delimiter string
 	}
 
 	return result
+}
+
+func shortenPrefix(associatePrefix, org, repo, currOrg, currRepo string, issueNumber int) string {
+	if org == currOrg && repo == currRepo {
+		return fmt.Sprintf("%s #%d", associatePrefix, issueNumber)
+	} else {
+		return fmt.Sprintf("%s %s/%s#%d", associatePrefix, org, repo, issueNumber)
+	}
+}
+
+func isLinkPrefix(prefix string) (bool, string, string) {
+	compile, err := regexp.Compile(linkPrefixRegexp)
+	if err != nil {
+		panic(fmt.Errorf("failed to compile the link prefix regexp: %v", err))
+	}
+
+	matches := compile.FindStringSubmatch(prefix)
+	groupNames := compile.SubexpNames()
+
+	if matches == nil {
+		return false, "", ""
+	}
+
+	org := ""
+	repo := ""
+	for i, match := range matches {
+		groupName := groupNames[i]
+		if groupName == orgGroupName {
+			org = match
+		} else if groupName == repoGroupName {
+			repo = match
+		}
+	}
+
+	return true, org, repo
+}
+
+func isFullPrefix(prefix string) (bool, string, string) {
+	compile, err := regexp.Compile(fullPrefixRegexp)
+	if err != nil {
+		panic(fmt.Errorf("failed to compile the full prefix regexp: %v", err))
+	}
+
+	matches := compile.FindStringSubmatch(prefix)
+	groupNames := compile.SubexpNames()
+
+	if matches == nil {
+		return false, "", ""
+	}
+
+	org := ""
+	repo := ""
+	for i, match := range matches {
+		groupName := groupNames[i]
+		if groupName == orgGroupName {
+			org = match
+		} else if groupName == repoGroupName {
+			repo = match
+		}
+	}
+
+	return true, org, repo
+}
+
+func isShortPrefix(prefix string) bool {
+	return prefix == shortPrefix
 }
 
 // isPassingTests returns whether or not all contexts set on the PR except for

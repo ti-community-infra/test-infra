@@ -3134,6 +3134,20 @@ func TestPrepareMergeDetails(t *testing.T) {
 		Body:       "my commit body",
 	}
 
+	repository := struct {
+		Name          githubql.String
+		NameWithOwner githubql.String
+		Owner         struct{ Login githubql.String }
+	}{
+		Name:          "tidb",
+		NameWithOwner: "pingcap/tidb",
+		Owner: struct {
+			Login githubql.String
+		}{
+			Login: "pingcap",
+		},
+	}
+
 	testCases := []struct {
 		name        string
 		tpl         config.TideMergeCommitTemplate
@@ -3231,13 +3245,16 @@ func TestPrepareMergeDetails(t *testing.T) {
 			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
 			Body: getTemplate("CommitBody", `
 				{{- $body := print .Body -}}
-				{{- .NormalizeIssueNumbers $body "" "" "" -}}
+				{{- $org := print .Repository.Owner.Login -}}
+				{{- $repo := print .Repository.Name -}}
+				{{- .NormalizeIssueNumbers $body $org $repo "" -}}
 			`),
 		},
 		pr: PullRequest{
 			Number:     githubql.Int(1),
 			Mergeable:  githubql.MergeableStateMergeable,
 			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
 			Title:      "my commit title",
 			Body:       "close #1\r\nIssue Number: close #2, ref #3\r\nref #4",
 		},
@@ -3255,14 +3272,17 @@ func TestPrepareMergeDetails(t *testing.T) {
 			Body: getTemplate("CommitBody", `
 				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
 				{{- $body := print .Body -}}
+				{{- $org := print .Repository.Owner.Login -}}
+				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- .NormalizeIssueNumbers $issueNumberLine "" "" "" -}}
+				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
 			`),
 		},
 		pr: PullRequest{
 			Number:     githubql.Int(1),
 			Mergeable:  githubql.MergeableStateMergeable,
 			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
 			Title:      "my commit title",
 			Body:       "close #1\r\nIssue Number: close #2, ref #3\r\nref #4",
 		},
@@ -3274,20 +3294,23 @@ func TestPrepareMergeDetails(t *testing.T) {
 			CommitMessage: "close #2, ref #3",
 		},
 	}, {
-		name: "Commit template uses NormalizeIssueNumbers function for issue link",
+		name: "Commit template uses NormalizeIssueNumbers to handle issue link",
 		tpl: config.TideMergeCommitTemplate{
 			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
 			Body: getTemplate("CommitBody", `
 				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
 				{{- $body := print .Body -}}
+				{{- $org := print .Repository.Owner.Login -}}
+				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- .NormalizeIssueNumbers $issueNumberLine "" "" "" -}}
+				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
 			`),
 		},
 		pr: PullRequest{
 			Number:     githubql.Int(1),
 			Mergeable:  githubql.MergeableStateMergeable,
 			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
 			Title:      "my commit title",
 			Body:       "close #1\r\nIssue Number: close #2, ref https://github.com/pingcap/tidb/issues/3\r\nref #4",
 		},
@@ -3299,22 +3322,53 @@ func TestPrepareMergeDetails(t *testing.T) {
 			CommitMessage: "close #2, ref #3",
 		},
 	}, {
-		name: "Commit template uses NormalizeIssueNumbers function for issue link limit org and repo",
+		name: "Commit template uses NormalizeIssueNumbers to handle cross-repository linked issue",
 		tpl: config.TideMergeCommitTemplate{
 			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
 			Body: getTemplate("CommitBody", `
 				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
 				{{- $body := print .Body -}}
+				{{- $org := print .Repository.Owner.Login -}}
+				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- .NormalizeIssueNumbers $issueNumberLine "tikv" "tikv" "" -}}
+				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
 			`),
 		},
 		pr: PullRequest{
 			Number:     githubql.Int(1),
 			Mergeable:  githubql.MergeableStateMergeable,
 			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
 			Title:      "my commit title",
 			Body:       "close #1\r\nIssue Number: close #2, ref https://github.com/tikv/tikv/issues/3\r\nref #4",
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "close #2, ref tikv/tikv#3",
+		},
+	}, {
+		name: "Commit template uses NormalizeIssueNumbers to handle issue number with full prefix",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
+				{{- $body := print .Body -}}
+				{{- $org := print .Repository.Owner.Login -}}
+				{{- $repo := print .Repository.Name -}}
+				{{- $issueNumberLine := $pattern.FindString $body -}}
+				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
+			Title:      "my commit title",
+			Body:       "close #1\r\nIssue Number: close #2, ref pingcap/tidb#3\r\nref #4",
 		},
 		mergeMethod: "merge",
 		expected: github.MergeDetails{
@@ -3324,20 +3378,51 @@ func TestPrepareMergeDetails(t *testing.T) {
 			CommitMessage: "close #2, ref #3",
 		},
 	}, {
-		name: "Commit template uses NormalizeIssueNumbers function for no-issue-number text",
+		name: "Commit template uses NormalizeIssueNumbers to handle cross-repository issue number with full prefix",
 		tpl: config.TideMergeCommitTemplate{
 			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
 			Body: getTemplate("CommitBody", `
 				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
 				{{- $body := print .Body -}}
+				{{- $org := print .Repository.Owner.Login -}}
+				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- .NormalizeIssueNumbers $issueNumberLine "" "" "" -}}
+				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
 			`),
 		},
 		pr: PullRequest{
 			Number:     githubql.Int(1),
 			Mergeable:  githubql.MergeableStateMergeable,
 			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
+			Title:      "my commit title",
+			Body:       "close #1\r\nIssue Number: close #2, ref tikv/tikv#3\r\nref #4",
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "close #2, ref tikv/tikv#3",
+		},
+	}, {
+		name: "Commit template uses NormalizeIssueNumbers to handle unrelated content",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
+				{{- $body := print .Body -}}
+				{{- $org := print .Repository.Owner.Login -}}
+				{{- $repo := print .Repository.Name -}}
+				{{- $issueNumberLine := $pattern.FindString $body -}}
+				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
 			Title:      "my commit title",
 			Body:       "foo",
 		},
