@@ -794,10 +794,13 @@ const (
 	defaultDelimiter           = ", "
 )
 
+// Regexp used to compile regular expressions and use it in CommitTemplate.
 func (pr PullRequest) Regexp(str string) *regexp.Regexp {
 	return regexp.MustCompile(str)
 }
 
+// NormalizeIssueNumbers is an utils method in CommitTemplate that used to extract the issue numbers in the text
+// and normalize it by a uniform format.
 func (pr PullRequest) NormalizeIssueNumbers(content, currOrg, currRepo, delimiter string) string {
 	pattern := fmt.Sprintf(issueNumberBlockRegexp, associatePrefixRegexp, issueNumberPrefixRegexp)
 	compile, err := regexp.Compile(pattern)
@@ -845,6 +848,8 @@ func (pr PullRequest) NormalizeIssueNumbers(content, currOrg, currRepo, delimite
 	return result
 }
 
+// shortenPrefix used to simplify the prefix format. If it is the issue number of the same repository, the short prefix
+// style will be used instead of the full prefix.
 func shortenPrefix(associatePrefix, org, repo, currOrg, currRepo string, issueNumber int) string {
 	if org == currOrg && repo == currRepo {
 		return fmt.Sprintf("%s #%d", associatePrefix, issueNumber)
@@ -853,6 +858,8 @@ func shortenPrefix(associatePrefix, org, repo, currOrg, currRepo string, issueNu
 	}
 }
 
+// isLinkPrefix used to determine whether the prefix style of the issue number is link prefix,
+// for example: https://github/com/pingcap/tidb/issues/123.
 func isLinkPrefix(prefix string) (bool, string, string) {
 	compile, err := regexp.Compile(linkPrefixRegexp)
 	if err != nil {
@@ -880,6 +887,7 @@ func isLinkPrefix(prefix string) (bool, string, string) {
 	return true, org, repo
 }
 
+// isFullPrefix used to determine whether the prefix style of the issue number is full prefix, for example: pingcap/tidb#123.
 func isFullPrefix(prefix string) (bool, string, string) {
 	compile, err := regexp.Compile(fullPrefixRegexp)
 	if err != nil {
@@ -907,6 +915,7 @@ func isFullPrefix(prefix string) (bool, string, string) {
 	return true, org, repo
 }
 
+// isShortPrefix used to determine whether the prefix style of the issue number is short prefix, for example: #123.
 func isShortPrefix(prefix string) bool {
 	return prefix == shortPrefix
 }
