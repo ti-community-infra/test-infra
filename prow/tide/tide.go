@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -775,6 +776,148 @@ func toSimpleState(s prowapi.ProwJobState) simpleState {
 		return successState
 	}
 	return failureState
+}
+
+const (
+	issueNumberBlockRegexp  = "(?i)%s\\s*%s(?P<issue_number>[1-9]\\d*)"
+	associatePrefixRegexp   = "(?P<associate_prefix>ref|close[sd]?|resolve[sd]?|fix(e[sd])?)"
+	issueNumberPrefixRegexp = "(?P<issue_number_prefix>(https|http)://github\\.com/[a-zA-Z0-9][a-zA-Z0-9-]{0,38}/[a-zA-Z0-9-_]{1,100}/issues/|[a-zA-Z0-9][a-zA-Z0-9-]{0,38}/[a-zA-Z0-9-_]{1,100}#|#)"
+	linkPrefixRegexp        = "(https|http)://github\\.com/(?P<org>[a-zA-Z0-9][a-zA-Z0-9-]{0,38})/(?P<repo>[a-zA-Z0-9-_]{1,100})/issues/"
+	fullPrefixRegexp        = "(?P<org>[a-zA-Z0-9][a-zA-Z0-9-]{0,38})/(?P<repo>[a-zA-Z0-9-_]{1,100})#"
+	shortPrefix             = "#"
+
+	associatePrefixGroupName   = "associate_prefix"
+	issueNumberPrefixGroupName = "issue_number_prefix"
+	issueNumberGroupName       = "issue_number"
+	orgGroupName               = "org"
+	repoGroupName              = "repo"
+	defaultDelimiter           = ", "
+)
+
+// Regexp used to compile regular expressions and use it in CommitTemplate.
+func (pr PullRequest) Regexp(str string) *regexp.Regexp {
+	return regexp.MustCompile(str)
+}
+
+// NormalizeIssueNumbers is an utils method in CommitTemplate that used to extract the issue numbers in the text
+// and normalize it by a uniform format.
+func (pr PullRequest) NormalizeIssueNumbers(content, currOrg, currRepo, delimiter string) string {
+	pattern := fmt.Sprintf(issueNumberBlockRegexp, associatePrefixRegexp, issueNumberPrefixRegexp)
+	compile, err := regexp.Compile(pattern)
+	if err != nil {
+		panic(fmt.Errorf("failed to compile the normalize regexp: %v", err))
+	}
+
+	allMatches := compile.FindAllStringSubmatch(content, -1)
+	groupNames := compile.SubexpNames()
+
+	issueNumbers := make([]string, 0)
+	for _, matches := range allMatches {
+		associatePrefix := ""
+		issueNumberPrefix := ""
+		issueNumber := 0
+		for i, groupName := range groupNames {
+			if groupName == associatePrefixGroupName {
+				associatePrefix = matches[i]
+			} else if groupName == issueNumberPrefixGroupName {
+				issueNumberPrefix = matches[i]
+			} else if groupName == issueNumberGroupName {
+				issueNumber, err = strconv.Atoi(matches[i])
+				if err != nil {
+					panic(fmt.Errorf("failed to get issue number: %v", err))
+				}
+			}
+		}
+
+		if b, org, repo := isLinkPrefix(issueNumberPrefix); b {
+			issueNumbers = append(issueNumbers, shortenPrefix(associatePrefix, org, repo, currOrg, currRepo, issueNumber))
+		} else if b, org, repo := isFullPrefix(issueNumberPrefix); b {
+			issueNumbers = append(issueNumbers, shortenPrefix(associatePrefix, org, repo, currOrg, currRepo, issueNumber))
+		} else if isShortPrefix(issueNumberPrefix) {
+			issueNumbers = append(issueNumbers, fmt.Sprintf("%s #%d", associatePrefix, issueNumber))
+		}
+	}
+
+	result := ""
+	if len(delimiter) == 0 {
+		result = strings.Join(issueNumbers, defaultDelimiter)
+	} else {
+		result = strings.Join(issueNumbers, delimiter)
+	}
+
+	return result
+}
+
+// shortenPrefix used to simplify the prefix format. If it is the issue number of the same repository, the short prefix
+// style will be used instead of the full prefix.
+func shortenPrefix(associatePrefix, org, repo, currOrg, currRepo string, issueNumber int) string {
+	if org == currOrg && repo == currRepo {
+		return fmt.Sprintf("%s #%d", associatePrefix, issueNumber)
+	} else {
+		return fmt.Sprintf("%s %s/%s#%d", associatePrefix, org, repo, issueNumber)
+	}
+}
+
+// isLinkPrefix used to determine whether the prefix style of the issue number is link prefix,
+// for example: https://github/com/pingcap/tidb/issues/123.
+func isLinkPrefix(prefix string) (bool, string, string) {
+	compile, err := regexp.Compile(linkPrefixRegexp)
+	if err != nil {
+		panic(fmt.Errorf("failed to compile the link prefix regexp: %v", err))
+	}
+
+	matches := compile.FindStringSubmatch(prefix)
+	groupNames := compile.SubexpNames()
+
+	if matches == nil {
+		return false, "", ""
+	}
+
+	org := ""
+	repo := ""
+	for i, match := range matches {
+		groupName := groupNames[i]
+		if groupName == orgGroupName {
+			org = match
+		} else if groupName == repoGroupName {
+			repo = match
+		}
+	}
+
+	return true, org, repo
+}
+
+// isFullPrefix used to determine whether the prefix style of the issue number is full prefix, for example: pingcap/tidb#123.
+func isFullPrefix(prefix string) (bool, string, string) {
+	compile, err := regexp.Compile(fullPrefixRegexp)
+	if err != nil {
+		panic(fmt.Errorf("failed to compile the full prefix regexp: %v", err))
+	}
+
+	matches := compile.FindStringSubmatch(prefix)
+	groupNames := compile.SubexpNames()
+
+	if matches == nil {
+		return false, "", ""
+	}
+
+	org := ""
+	repo := ""
+	for i, match := range matches {
+		groupName := groupNames[i]
+		if groupName == orgGroupName {
+			org = match
+		} else if groupName == repoGroupName {
+			repo = match
+		}
+	}
+
+	return true, org, repo
+}
+
+// isShortPrefix used to determine whether the prefix style of the issue number is short prefix, for example: #123.
+func isShortPrefix(prefix string) bool {
+	return prefix == shortPrefix
 }
 
 // isPassingTests returns whether or not all contexts set on the PR except for
