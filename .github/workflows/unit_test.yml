@@ -43,7 +43,8 @@ jobs:
 
       - name: Test
         run: |
-          bazel test //prow/config:go_default_test
           bazel test //prow/cmd/tide:go_default_test
           bazel test //prow/cmd/checkconfig:go_default_test
-
+          bazel test //prow/config:go_default_test
+          bazel test //prow/github:go_default_test
+          bazel test //prow/tide:go_default_test
