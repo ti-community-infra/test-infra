@@ -25,7 +25,7 @@ func TestNormalizeIssueNumbers(t *testing.T) {
 			},
 		},
 		{
-			name:     "issue number with full prefix in the same Repo",
+			name:     "issue number with full prefix in the same repo",
 			content:  "Issue Number: close pingcap/tidb#123",
 			currOrg:  "pingcap",
 			currRepo: "tidb",
@@ -35,7 +35,7 @@ func TestNormalizeIssueNumbers(t *testing.T) {
 			},
 		},
 		{
-			name:     "issue number with full prefix in the another Repo",
+			name:     "issue number with full prefix in the another repo",
 			content:  "Issue Number: close pingcap/tiflow#123",
 			currOrg:  "pingcap",
 			currRepo: "tidb",
@@ -45,7 +45,7 @@ func TestNormalizeIssueNumbers(t *testing.T) {
 			},
 		},
 		{
-			name:     "issue Number with full prefix in the another Org",
+			name:     "issue number with full prefix in the another Org",
 			content:  "Issue Number: close tikv/tikv#123",
 			currOrg:  "pingcap",
 			currRepo: "tidb",
@@ -55,7 +55,7 @@ func TestNormalizeIssueNumbers(t *testing.T) {
 			},
 		},
 		{
-			name:     "issue Number with link prefix in the same Repo",
+			name:     "issue number with link prefix in the same repo",
 			content:  "Issue Number: close https://github.com/pingcap/tidb/issues/123",
 			currOrg:  "pingcap",
 			currRepo: "tidb",
@@ -65,7 +65,7 @@ func TestNormalizeIssueNumbers(t *testing.T) {
 			},
 		},
 		{
-			name:     "issue Number with link prefix in the another Repo",
+			name:     "issue number with link prefix in the another repo",
 			content:  "Issue Number: close https://github.com/pingcap/tiflow/issues/123",
 			currOrg:  "pingcap",
 			currRepo: "tidb",
@@ -75,7 +75,7 @@ func TestNormalizeIssueNumbers(t *testing.T) {
 			},
 		},
 		{
-			name:     "issue Number with link prefix in the another Org",
+			name:     "issue number with link prefix in the another org",
 			content:  "Issue Number: close https://github.com/tikv/tikv/issues/123",
 			currOrg:  "pingcap",
 			currRepo: "tidb",
