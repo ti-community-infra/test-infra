@@ -3440,16 +3440,19 @@ func TestPrepareMergeDetails(t *testing.T) {
 				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
 				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
-				{{- range $index, $number := $numbers -}}
-					{{- if $index }}, {{ end -}}
-					{{- /* simplify issue number prefix */ -}}
-					{{- if and (eq .Org $org) (eq .Repo $repo) -}}
-						{{- .AssociatePrefix }} #{{ .Number -}}
-					{{- else -}}
-						{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+				{{- if $numbers -}}
+					{{- range $index, $number := $numbers -}}
+						{{- if $index }}, {{ end -}}
+						{{- /* simplify issue number prefix */ -}}
+						{{- if and (eq .Org $org) (eq .Repo $repo) -}}
+							{{- .AssociatePrefix }} #{{ .Number -}}
+						{{- else -}}
+							{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+						{{- end -}}
 					{{- end -}}
+				{{- else -}}
+					{{- " " -}}
 				{{- end -}}
-				{{- " " -}}
 			`),
 		},
 		pr: PullRequest{
@@ -3465,7 +3468,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 			SHA:           "SHA",
 			MergeMethod:   "merge",
 			CommitTitle:   "my commit title (#1)",
-			CommitMessage: "close #1, close #2, ref tikv/tikv#3, ref pingcap/tiflow#4 ",
+			CommitMessage: "close #1, close #2, ref tikv/tikv#3, ref pingcap/tiflow#4",
 		},
 	}, {
 		name: "Commit template uses NormalizeIssueNumbers to handle unrelated content",
@@ -3478,11 +3481,14 @@ func TestPrepareMergeDetails(t *testing.T) {
 				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
 				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
-				{{- range $index, $number := $numbers -}}
-				{{- if $index }}, {{ end -}}
-				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+				{{- if $numbers -}}
+					{{- range $index, $number := $numbers -}}
+						{{- if $index }}, {{ end -}}
+						{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+					{{- end -}}
+				{{- else -}}
+					{{- " " -}}
 				{{- end -}}
-				{{- " " -}}
 			`),
 		},
 		pr: PullRequest{
