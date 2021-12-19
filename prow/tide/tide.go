@@ -785,8 +785,8 @@ func (pr PullRequest) Regexp(str string) *regexp.Regexp {
 
 // NormalizeIssueNumbers is an utils method in CommitTemplate that used to extract the issue numbers in the text
 // and normalize it by a uniform format.
-func (pr PullRequest) NormalizeIssueNumbers(content, currOrg, currRepo, delimiter string) string {
-	return github.NormalizeIssueNumbers(content, currOrg, currRepo, delimiter)
+func (pr PullRequest) NormalizeIssueNumbers(content, currOrg, currRepo string) []github.IssueNumberData {
+	return github.NormalizeIssueNumbers(content, currOrg, currRepo)
 }
 
 // isPassingTests returns whether or not all contexts set on the PR except for
