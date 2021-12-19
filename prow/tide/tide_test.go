@@ -3515,7 +3515,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 		actual := c.prepareMergeDetails(test.tpl, test.pr, test.mergeMethod)
 
 		if !reflect.DeepEqual(actual, test.expected) {
-			t.Errorf("Case %s failed: \nexpected:\n%+v\nbut got:\n%+v\n", test.name, test.expected, actual)
+			t.Errorf("Case %s failed: expected %+v, got %+v", test.name, test.expected, actual)
 		}
 	}
 }

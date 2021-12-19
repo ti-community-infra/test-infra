@@ -123,7 +123,7 @@ func TestNormalizeIssueNumbers(t *testing.T) {
 		actualNumbers := NormalizeIssueNumbers(tc.content, tc.currOrg, tc.currRepo)
 
 		if !reflect.DeepEqual(tc.expectNumbers, actualNumbers) {
-			t.Errorf("For case \"%s\": \nexpect issue numbers are: \n%v\nbut got: \n%v",
+			t.Errorf("For case \"%s\": \nexpect issue numbers are: \n%+v\nbut got: \n%+v",
 				tc.name, tc.expectNumbers, actualNumbers)
 		}
 	}
