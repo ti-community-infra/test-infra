@@ -3220,7 +3220,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 		tpl: config.TideMergeCommitTemplate{
 			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
 			Body: getTemplate("CommitBody", `
-				{{- $pattern := .Regexp "(?i)Issue Number:\\s*((,\\s*)?(ref|close[sd]?|resolve[sd]?|fix(e[sd])?)\\s*#(?P<issue_number>[1-9]\\d*))+" -}}
+				{{- $pattern := .Regexp "(?im)Issue Number:\\s*((,\\s*)?(ref|close[sd]?|resolve[sd]?|fix(e[sd])?)\\s*#(?P<issue_number>[1-9]\\d*))+" -}}
 				{{- $body := print .Body -}}
 				{{- $pattern.FindString $body -}}
 			`),
@@ -3247,7 +3247,11 @@ func TestPrepareMergeDetails(t *testing.T) {
 				{{- $body := print .Body -}}
 				{{- $org := print .Repository.Owner.Login -}}
 				{{- $repo := print .Repository.Name -}}
-				{{- .NormalizeIssueNumbers $body $org $repo "" -}}
+				{{- $numbers := .NormalizeIssueNumbers $body $org $repo -}}
+				{{- range $index, $number := $numbers -}}
+				{{- if $index }}, {{ end -}}
+				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+				{{- end -}}
 			`),
 		},
 		pr: PullRequest{
@@ -3263,7 +3267,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 			SHA:           "SHA",
 			MergeMethod:   "merge",
 			CommitTitle:   "my commit title (#1)",
-			CommitMessage: "close #1, close #2, ref #3, ref #4",
+			CommitMessage: "close pingcap/tidb#1, close pingcap/tidb#2, ref pingcap/tidb#3, ref pingcap/tidb#4",
 		},
 	}, {
 		name: "Commit template uses Regexp and NormalizeIssueNumbers function",
@@ -3275,7 +3279,11 @@ func TestPrepareMergeDetails(t *testing.T) {
 				{{- $org := print .Repository.Owner.Login -}}
 				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- range $index, $number := $numbers -}}
+				{{- if $index }}, {{ end -}}
+				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+				{{- end -}}
 			`),
 		},
 		pr: PullRequest{
@@ -3291,7 +3299,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 			SHA:           "SHA",
 			MergeMethod:   "merge",
 			CommitTitle:   "my commit title (#1)",
-			CommitMessage: "close #2, ref #3",
+			CommitMessage: "close pingcap/tidb#2, ref pingcap/tidb#3",
 		},
 	}, {
 		name: "Commit template uses NormalizeIssueNumbers to handle issue link",
@@ -3303,7 +3311,11 @@ func TestPrepareMergeDetails(t *testing.T) {
 				{{- $org := print .Repository.Owner.Login -}}
 				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- range $index, $number := $numbers -}}
+				{{- if $index }}, {{ end -}}
+				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+				{{- end -}}
 			`),
 		},
 		pr: PullRequest{
@@ -3319,7 +3331,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 			SHA:           "SHA",
 			MergeMethod:   "merge",
 			CommitTitle:   "my commit title (#1)",
-			CommitMessage: "close #2, ref #3",
+			CommitMessage: "close pingcap/tidb#2, ref pingcap/tidb#3",
 		},
 	}, {
 		name: "Commit template uses NormalizeIssueNumbers to handle cross-repository linked issue",
@@ -3331,7 +3343,11 @@ func TestPrepareMergeDetails(t *testing.T) {
 				{{- $org := print .Repository.Owner.Login -}}
 				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- range $index, $number := $numbers -}}
+				{{- if $index }}, {{ end -}}
+				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+				{{- end -}}
 			`),
 		},
 		pr: PullRequest{
@@ -3347,7 +3363,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 			SHA:           "SHA",
 			MergeMethod:   "merge",
 			CommitTitle:   "my commit title (#1)",
-			CommitMessage: "close #2, ref tikv/tikv#3",
+			CommitMessage: "close pingcap/tidb#2, ref tikv/tikv#3",
 		},
 	}, {
 		name: "Commit template uses NormalizeIssueNumbers to handle issue number with full prefix",
@@ -3359,7 +3375,11 @@ func TestPrepareMergeDetails(t *testing.T) {
 				{{- $org := print .Repository.Owner.Login -}}
 				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- range $index, $number := $numbers -}}
+				{{- if $index }}, {{ end -}}
+				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+				{{- end -}}
 			`),
 		},
 		pr: PullRequest{
@@ -3375,7 +3395,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 			SHA:           "SHA",
 			MergeMethod:   "merge",
 			CommitTitle:   "my commit title (#1)",
-			CommitMessage: "close #2, ref #3",
+			CommitMessage: "close pingcap/tidb#2, ref pingcap/tidb#3",
 		},
 	}, {
 		name: "Commit template uses NormalizeIssueNumbers to handle cross-repository issue number with full prefix",
@@ -3387,7 +3407,11 @@ func TestPrepareMergeDetails(t *testing.T) {
 				{{- $org := print .Repository.Owner.Login -}}
 				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- range $index, $number := $numbers -}}
+				{{- if $index }}, {{ end -}}
+				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+				{{- end -}}
 			`),
 		},
 		pr: PullRequest{
@@ -3403,19 +3427,62 @@ func TestPrepareMergeDetails(t *testing.T) {
 			SHA:           "SHA",
 			MergeMethod:   "merge",
 			CommitTitle:   "my commit title (#1)",
-			CommitMessage: "close #2, ref tikv/tikv#3",
+			CommitMessage: "close pingcap/tidb#2, ref tikv/tikv#3",
+		},
+	}, {
+		name: "Commit template uses NormalizeIssueNumbers with template shorten issue number prefix",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $pattern := .Regexp "(?im)^Issue Number:.+" -}}
+				{{- $body := print .Body -}}
+				{{- $org := print .Repository.Owner.Login -}}
+				{{- $repo := print .Repository.Name -}}
+				{{- $issueNumberLine := $pattern.FindString $body -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- range $index, $number := $numbers -}}
+					{{- if $index }}, {{ end -}}
+					{{- /* simplify issue number prefix */ -}}
+					{{- if and (eq .Org $org) (eq .Repo $repo) -}}
+						{{- .AssociatePrefix }} #{{ .Number -}}
+					{{- else -}}
+						{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+					{{- end -}}
+				{{- end -}}
+				{{- " " -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
+			Title:      "my commit title",
+			Body:       "\r\nIssue Number: close #1, close pingcap/tidb#2, ref tikv/tikv#3, ref pingcap/tiflow#4\r\n",
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "close #1, close #2, ref tikv/tikv#3, ref pingcap/tiflow#4 ",
 		},
 	}, {
 		name: "Commit template uses NormalizeIssueNumbers to handle unrelated content",
 		tpl: config.TideMergeCommitTemplate{
 			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
 			Body: getTemplate("CommitBody", `
-				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
+				{{- $pattern := .Regexp "(?im)^Issue Number:.+" -}}
 				{{- $body := print .Body -}}
 				{{- $org := print .Repository.Owner.Login -}}
 				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- .NormalizeIssueNumbers $issueNumberLine $org $repo "" -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- range $index, $number := $numbers -}}
+				{{- if $index }}, {{ end -}}
+				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+				{{- end -}}
+				{{- " " -}}
 			`),
 		},
 		pr: PullRequest{
@@ -3431,7 +3498,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 			SHA:           "SHA",
 			MergeMethod:   "merge",
 			CommitTitle:   "my commit title (#1)",
-			CommitMessage: "",
+			CommitMessage: " ",
 		},
 	}}
 
