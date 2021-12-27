@@ -17,6 +17,7 @@ go_test(
         "links_test.go",
         "types_test.go",
         "issue_number_test.go",
+        "commit_test.go",
     ],
     embed = [":go_default_library"],
     tags = ["manual"],
@@ -44,6 +45,7 @@ go_library(
         "types.go",
         "webhooks.go",
         "issue_number.go",
+        "commit.go",
     ],
     importpath = "k8s.io/test-infra/prow/github",
     deps = [
