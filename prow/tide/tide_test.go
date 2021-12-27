@@ -3659,6 +3659,18 @@ func TestPrepareMergeDetails(t *testing.T) {
 							},
 						},
 					},
+					{
+						Commit: Commit{
+							Message: "commit message headline 3\n\nSigned-off-by: wangwu <wangwu@gmail.com>",
+							Author: Author{
+								Email: "wangwu@gmail.com",
+								Name:  "wangwu",
+								User: User{
+									Login: "wangwu",
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -3667,7 +3679,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 			SHA:           "SHA",
 			MergeMethod:   "merge",
 			CommitTitle:   "my commit title (#1)",
-			CommitMessage: "Signed-off-by: foo <foo.bar@gmail.com>\nSigned-off-by: zhangsan <zhangsan@gmail.com>\nCo-authored-by: zhangsan <zhangsan@gmail.com>",
+			CommitMessage: "Signed-off-by: foo <foo.bar@gmail.com>\nSigned-off-by: zhangsan <zhangsan@gmail.com>\nSigned-off-by: wangwu <wangwu@gmail.com>\nCo-authored-by: zhangsan <zhangsan@gmail.com>\nCo-authored-by: wangwu <wangwu@gmail.com>",
 		},
 	}, {
 		name: "Commit template uses NormalizeSignedOffBy and NormalizeCoAuthorBy func to handle non-signed commit",
