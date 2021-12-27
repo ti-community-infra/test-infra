@@ -58,6 +58,7 @@ type githubClient interface {
 	GetCombinedStatus(org, repo, ref string) (*github.CombinedStatus, error)
 	ListCheckRuns(org, repo, ref string) (*github.CheckRunList, error)
 	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
+	ListPRCommits(org, repo string, number int) ([]github.RepositoryCommit, error)
 	GetRef(string, string, string) (string, error)
 	GetRepo(owner, name string) (github.FullRepo, error)
 	Merge(string, string, int, github.MergeDetails) error
@@ -785,8 +786,50 @@ func (pr PullRequest) Regexp(str string) *regexp.Regexp {
 
 // NormalizeIssueNumbers is an utils method in CommitTemplate that used to extract the issue numbers in the text
 // and normalize it by a uniform format.
-func (pr PullRequest) NormalizeIssueNumbers(content, currOrg, currRepo string) []github.IssueNumberData {
+func (pr PullRequest) NormalizeIssueNumbers(content string) []github.IssueNumberData {
+	currOrg := string(pr.Repository.Owner.Login)
+	currRepo := string(pr.Repository.Name)
 	return github.NormalizeIssueNumbers(content, currOrg, currRepo)
+}
+
+func (pr PullRequest) NormalizeSignedOffBy() []github.SignedAuthor {
+	commitNodes := pr.Commits.Nodes
+
+	if len(commitNodes) == 0 {
+		return []github.SignedAuthor{}
+	}
+
+	commitMessages := make([]string, 0)
+	for _, node := range commitNodes {
+		commitMessages = append(commitMessages, string(node.Commit.Message))
+	}
+
+	return github.NormalizeSignedOffBy(commitMessages)
+}
+
+func (pr PullRequest) NormalizeCoAuthorBy() []github.CoAuthor {
+	commitNodes := pr.Commits.Nodes
+	prAuthorLogin := string(pr.Author.Login)
+
+	if len(commitNodes) == 0 {
+		return []github.CoAuthor{}
+	}
+
+	authors := make([]github.CommitAuthor, 0)
+	for _, node := range commitNodes {
+		// Convert graphql node to rest api object.
+		commitAuthor := github.CommitAuthor{}
+		commitAuthor.Name = string(node.Commit.Author.Name)
+		commitAuthor.Email = string(node.Commit.Author.Email)
+		if len(node.Commit.Author.User.Login) != 0 {
+			login := string(node.Commit.Author.User.Login)
+			commitAuthor.Login = &login
+		}
+
+		authors = append(authors, commitAuthor)
+	}
+
+	return github.NormalizeCoAuthorBy(authors, prAuthorLogin)
 }
 
 // isPassingTests returns whether or not all contexts set on the PR except for
@@ -1157,6 +1200,59 @@ func (c *Controller) pickBatch(sp subpool, cc map[int]contextChecker, newBatchFu
 	return res, presubmits, nil
 }
 
+func (c *Controller) preparePRCommits(pr *PullRequest) error {
+	org := string(pr.Repository.Owner.Login)
+	repo := string(pr.Repository.Name)
+	number := int(pr.Number)
+
+	// Store the SHA of commits that have been queried through graphql.
+	lastCommitNodesMap := make(map[string]CommitNode)
+	for _, node := range pr.Commits.Nodes {
+		SHA := string(node.Commit.OID)
+		if len(SHA) != 0 {
+			lastCommitNodesMap[SHA] = node
+		}
+	}
+
+	// Notice：We only fetch the commits list, the checks and statuses related to commits will not be fetched.
+	commits, err := c.ghc.ListPRCommits(org, repo, number)
+	if err != nil {
+		return err
+	}
+
+	commitNodes := make([]struct {
+		Commit Commit
+	}, 0)
+	for _, commit := range commits {
+		// Use the commit node that queryed by graphql.
+		if node, ok := lastCommitNodesMap[commit.SHA]; ok {
+			commitNodes = append(commitNodes, node)
+			continue
+		}
+
+		// Construct the commit node from the commit object that queryed by rest API.
+		gitCommit := commit.Commit
+		commitNodes = append(commitNodes, struct {
+			Commit Commit
+		}{
+			Commit: Commit{
+				OID:     githubql.String(commit.SHA),
+				Message: githubql.String(gitCommit.Message),
+				Author: Author{
+					Name:  githubql.String(gitCommit.Author.Name),
+					Email: githubql.String(gitCommit.Author.Email),
+					User: User{
+						Login: githubql.String(commit.Author.Login),
+					},
+				},
+			},
+		})
+	}
+	pr.Commits.Nodes = commitNodes
+
+	return nil
+}
+
 func (c *Controller) prepareMergeDetails(commitTemplates config.TideMergeCommitTemplate, pr PullRequest, mergeMethod github.PullRequestMergeType) github.MergeDetails {
 	ghMergeDetails := github.MergeDetails{
 		SHA:         string(pr.HeadRefOID),
@@ -1246,6 +1342,12 @@ func (c *Controller) mergePRs(sp subpool, prs []PullRequest) error {
 			log.WithError(err).Error("Unable to set tide context to SUCCESS.")
 			errs = append(errs, err)
 			failed = append(failed, int(pr.Number))
+			continue
+		}
+
+		// Notice: In order to be able to generate complete Signed-off information, we need to complete the PR commits list here.
+		if err := c.preparePRCommits(&pr); err != nil {
+			log.WithError(err).Errorf("Failed to prepare commits list for PR %s/%s#%d.", sp.org, sp.repo, int(pr.Number))
 			continue
 		}
 
@@ -1888,6 +1990,8 @@ type Commit struct {
 	Status            CommitStatus
 	OID               githubql.String `graphql:"oid"`
 	StatusCheckRollup StatusCheckRollup
+	Message           githubql.String
+	Author            Author
 }
 
 type CommitStatus struct {
@@ -1896,6 +2000,16 @@ type CommitStatus struct {
 
 type StatusCheckRollup struct {
 	Contexts StatusCheckRollupContext `graphql:"contexts(last: 100)"`
+}
+
+type Author struct {
+	Email githubql.String
+	Name  githubql.String
+	User  User
+}
+
+type User struct {
+	Login githubql.String
 }
 
 type StatusCheckRollupContext struct {
