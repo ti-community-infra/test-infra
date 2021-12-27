@@ -799,6 +799,20 @@ func (f *fgc) GetPullRequestChanges(org, repo string, number int) ([]github.Pull
 		nil
 }
 
+func (f *fgc) ListPRCommits(org, repo string, number int) ([]github.RepositoryCommit, error) {
+	if number != 100 {
+		return nil, nil
+	}
+	return []github.RepositoryCommit{
+		{
+			SHA: "sha",
+			Commit: github.GitCommit{
+				Message: "This is my commit message\n\nSigned-off-by: Random J Developer <random@developer.example.org>",
+			},
+		},
+	}, nil
+}
+
 // TestDividePool ensures that subpools returned by dividePool satisfy a few
 // important invariants.
 func TestDividePool(t *testing.T) {
@@ -3245,9 +3259,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
 			Body: getTemplate("CommitBody", `
 				{{- $body := print .Body -}}
-				{{- $org := print .Repository.Owner.Login -}}
-				{{- $repo := print .Repository.Name -}}
-				{{- $numbers := .NormalizeIssueNumbers $body $org $repo -}}
+				{{- $numbers := .NormalizeIssueNumbers $body -}}
 				{{- range $index, $number := $numbers -}}
 				{{- if $index }}, {{ end -}}
 				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
@@ -3276,10 +3288,8 @@ func TestPrepareMergeDetails(t *testing.T) {
 			Body: getTemplate("CommitBody", `
 				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
 				{{- $body := print .Body -}}
-				{{- $org := print .Repository.Owner.Login -}}
-				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine -}}
 				{{- range $index, $number := $numbers -}}
 				{{- if $index }}, {{ end -}}
 				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
@@ -3308,10 +3318,8 @@ func TestPrepareMergeDetails(t *testing.T) {
 			Body: getTemplate("CommitBody", `
 				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
 				{{- $body := print .Body -}}
-				{{- $org := print .Repository.Owner.Login -}}
-				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine -}}
 				{{- range $index, $number := $numbers -}}
 				{{- if $index }}, {{ end -}}
 				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
@@ -3340,10 +3348,8 @@ func TestPrepareMergeDetails(t *testing.T) {
 			Body: getTemplate("CommitBody", `
 				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
 				{{- $body := print .Body -}}
-				{{- $org := print .Repository.Owner.Login -}}
-				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine -}}
 				{{- range $index, $number := $numbers -}}
 				{{- if $index }}, {{ end -}}
 				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
@@ -3372,10 +3378,8 @@ func TestPrepareMergeDetails(t *testing.T) {
 			Body: getTemplate("CommitBody", `
 				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
 				{{- $body := print .Body -}}
-				{{- $org := print .Repository.Owner.Login -}}
-				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine -}}
 				{{- range $index, $number := $numbers -}}
 				{{- if $index }}, {{ end -}}
 				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
@@ -3404,10 +3408,8 @@ func TestPrepareMergeDetails(t *testing.T) {
 			Body: getTemplate("CommitBody", `
 				{{- $pattern := .Regexp "(?i)Issue Number:.+" -}}
 				{{- $body := print .Body -}}
-				{{- $org := print .Repository.Owner.Login -}}
-				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine -}}
 				{{- range $index, $number := $numbers -}}
 				{{- if $index }}, {{ end -}}
 				{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
@@ -3434,12 +3436,14 @@ func TestPrepareMergeDetails(t *testing.T) {
 		tpl: config.TideMergeCommitTemplate{
 			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
 			Body: getTemplate("CommitBody", `
-				{{- $pattern := .Regexp "(?im)^Issue Number:.+" -}}
+				{{- /* convert graphql.String to string type */ -}}
 				{{- $body := print .Body -}}
 				{{- $org := print .Repository.Owner.Login -}}
 				{{- $repo := print .Repository.Name -}}
+
+				{{- $pattern := .Regexp "(?im)^Issue Number:.+" -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine -}}
 				{{- if $numbers -}}
 					{{- range $index, $number := $numbers -}}
 						{{- if $index }}, {{ end -}}
@@ -3477,10 +3481,8 @@ func TestPrepareMergeDetails(t *testing.T) {
 			Body: getTemplate("CommitBody", `
 				{{- $pattern := .Regexp "(?im)^Issue Number:.+" -}}
 				{{- $body := print .Body -}}
-				{{- $org := print .Repository.Owner.Login -}}
-				{{- $repo := print .Repository.Name -}}
 				{{- $issueNumberLine := $pattern.FindString $body -}}
-				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine $org $repo -}}
+				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine -}}
 				{{- if $numbers -}}
 					{{- range $index, $number := $numbers -}}
 						{{- if $index }}, {{ end -}}
@@ -3505,6 +3507,219 @@ func TestPrepareMergeDetails(t *testing.T) {
 			MergeMethod:   "merge",
 			CommitTitle:   "my commit title (#1)",
 			CommitMessage: " ",
+		},
+	}, {
+		name: "Commit template uses NormalizeSignedOffBy func",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $signedAuthors := .NormalizeSignedOffBy -}}
+				{{- range $index, $author := $signedAuthors -}}
+				{{- "Signed-off-by:" }} {{ .Name }} <{{- .Email -}}>{{- "\n" -}}
+				{{- end -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
+			Title:      "my commit title",
+			Body:       "foo",
+			Commits: struct{ Nodes []struct{ Commit Commit } }{
+				Nodes: []struct{ Commit Commit }{
+					{
+						Commit: Commit{
+							Message: "commit message headline 1\n\nSigned-off-by: foo <foo.bar@gmail.com>",
+						},
+					},
+					{
+						Commit: Commit{
+							Message: "commit message headline 2\n\nSigned-off-by: foo <foo.bar@gmail.com>",
+						},
+					},
+				},
+			},
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "Signed-off-by: foo <foo.bar@gmail.com>\n",
+		},
+	}, {
+		name: "Commit template uses NormalizeCoAuthorBy func",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $coAuthors := .NormalizeCoAuthorBy -}}
+				{{- range $index, $author := $coAuthors -}}
+				{{- "Co-authored-by:" }} {{ .Name }} <{{- .Email -}}>{{- "\n" -}}
+				{{- end -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
+			Title:      "my commit title",
+			Body:       "foo",
+			Author: User{
+				Login: "foo",
+			},
+			Commits: struct{ Nodes []struct{ Commit Commit } }{
+				Nodes: []struct{ Commit Commit }{
+					{
+						Commit: Commit{
+							Message: "commit message headline 1\n\nSigned-off-by: foo <foo.bar@gmail.com>",
+							Author: Author{
+								Email: "foo.bar@gmail.com",
+								Name:  "foo",
+								User: User{
+									Login: "foo",
+								},
+							},
+						},
+					},
+					{
+						Commit: Commit{
+							Message: "commit message headline 2\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>",
+							Author: Author{
+								Email: "zhangsan@gmail.com",
+								Name:  "zhangsan",
+								User: User{
+									Login: "zhangsan",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "Co-authored-by: zhangsan <zhangsan@gmail.com>\n",
+		},
+	}, {
+		name: "Commit template uses NormalizeSignedOffBy and NormalizeCoAuthorBy func",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $signedAuthors := .NormalizeSignedOffBy -}}
+				{{- range $index, $author := $signedAuthors -}}
+					{{- if $index -}}{{- "\n" -}}{{- end -}}
+					{{- "Signed-off-by:" }} {{ .Name }} <{{- .Email -}}>
+				{{- end -}}
+				{{- "\n" -}}
+				{{- $coAuthors := .NormalizeCoAuthorBy -}}
+				{{- range $index, $author := $coAuthors -}}
+					{{- if $index -}}{{- "\n" -}}{{- end -}}
+					{{- "Co-authored-by:" }} {{ .Name }} <{{- .Email -}}>
+				{{- end -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
+			Title:      "my commit title",
+			Body:       "foo",
+			Author: User{
+				Login: "foo",
+			},
+			Commits: struct{ Nodes []struct{ Commit Commit } }{
+				Nodes: []struct{ Commit Commit }{
+					{
+						Commit: Commit{
+							Message: "commit message headline 1\n\nSigned-off-by: foo <foo.bar@gmail.com>",
+							Author: Author{
+								Email: "foo.bar@gmail.com",
+								Name:  "foo",
+								User: User{
+									Login: "foo",
+								},
+							},
+						},
+					},
+					{
+						Commit: Commit{
+							Message: "commit message headline 2\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>",
+							Author: Author{
+								Email: "zhangsan@gmail.com",
+								Name:  "zhangsan",
+								User: User{
+									Login: "zhangsan",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "Signed-off-by: foo <foo.bar@gmail.com>\nSigned-off-by: zhangsan <zhangsan@gmail.com>\nCo-authored-by: zhangsan <zhangsan@gmail.com>",
+		},
+	}, {
+		name: "Commit template uses NormalizeSignedOffBy and NormalizeCoAuthorBy func to handle non-signed commit",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body: getTemplate("CommitBody", `
+				{{- $signedAuthors := .NormalizeSignedOffBy -}}
+				{{- range $index, $author := $signedAuthors -}}
+					{{- if $index -}}{{- "\n" -}}{{- end -}}
+					{{- "Signed-off-by:" }} {{ .Name }} <{{- .Email -}}>
+				{{- end -}}
+				{{- $coAuthors := .NormalizeCoAuthorBy -}}
+				{{- if $coAuthors -}}{{- "\n" -}}{{- end -}}
+				{{- range $index, $author := $coAuthors -}}
+					{{- if $index -}}{{- "\n" -}}{{- end -}}
+					{{- "Co-authored-by:" }} {{ .Name }} <{{- .Email -}}>
+				{{- end -}}
+			`),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
+			Title:      "my commit title",
+			Body:       "foo",
+			Author: User{
+				Login: "zhangsan",
+			},
+			Commits: struct{ Nodes []struct{ Commit Commit } }{
+				Nodes: []struct{ Commit Commit }{
+					{
+						Commit: Commit{
+							Message: "commit message headline 1",
+							Author: Author{
+								Email: "zhangsan@gmail.com",
+								Name:  "zhangsan",
+								User: User{
+									Login: "zhangsan",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:           "SHA",
+			MergeMethod:   "merge",
+			CommitTitle:   "my commit title (#1)",
+			CommitMessage: "",
 		},
 	}}
 
