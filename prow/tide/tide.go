@@ -780,8 +780,29 @@ func toSimpleState(s prowapi.ProwJobState) simpleState {
 }
 
 // Regexp used to compile regular expressions and use it in CommitTemplate.
-func (pr PullRequest) Regexp(str string) *regexp.Regexp {
-	return regexp.MustCompile(str)
+func (pr PullRequest) Regexp(pattern string) *regexp.Regexp {
+	return regexp.MustCompile(pattern)
+}
+
+// ExtractContent used to extract text content through regular expressions.
+// Engage that when the regexp contains a named group named `content`, only the part matched by the named group
+// will be returned, if not, the part matched by the entire regular expression will be returned.
+func (pr PullRequest) ExtractContent(pattern string, content string) string {
+	compile, err := regexp.Compile(pattern)
+	if err != nil {
+		panic(fmt.Errorf("failed to compile the extract content regexp: %v", err))
+	}
+
+	index := compile.SubexpIndex("content")
+	if index == -1 {
+		return compile.FindString(content)
+	} else {
+		if compile.MatchString(content) {
+			matches := compile.FindStringSubmatch(content)
+			return strings.TrimSpace(matches[index])
+		}
+		return ""
+	}
 }
 
 // NormalizeIssueNumbers is an utils method in CommitTemplate that used to extract the issue numbers in the text
