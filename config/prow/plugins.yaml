@@ -67,6 +67,7 @@ approve:
 - repos:
   - kubernetes/cloud-provider-openstack
   - kubernetes-sigs/cluster-api
+  - kubernetes-sigs/cluster-api-operator
   - kubernetes-sigs/cluster-api-provider-aws
   - kubernetes-sigs/cluster-api-provider-azure
   - kubernetes-sigs/cluster-api-provider-gcp
@@ -400,7 +401,7 @@ milestone_applier:
     release-0.6: v0.6.x
     release-0.5: v0.5.x
   kubernetes/website:
-    dev-1.23: 1.23
+    dev-1.24: 1.24
 
 repo_milestone:
   # Default maintainer
@@ -513,7 +514,7 @@ config_updater:
       clusters:
         test-infra-trusted:
           - default
-    config/jobs/**/*.yaml:
+    config/jobs/**/*.{yaml,yml}:
       name: job-config
       gzip: true
       clusters:

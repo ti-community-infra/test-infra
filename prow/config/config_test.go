@@ -572,6 +572,70 @@ periodics:
 			},
 		},
 		{
+			name: "with non-existent additional field allowed under 'prow_ignored'",
+			rawConfig: `
+prow_ignored:
+  lolNotARealField: bogus
+plank:
+  default_decoration_configs:
+    '*':
+      timeout: 2h
+      grace_period: 15s
+      utility_images:
+        clonerefs: "clonerefs:default"
+        initupload: "initupload:default"
+        entrypoint: "entrypoint:default"
+        sidecar: "sidecar:default"
+      gcs_configuration:
+        bucket: "default-bucket"
+        path_strategy: "legacy"
+        default_org: "kubernetes"
+        default_repo: "kubernetes"
+      gcs_credentials_secret: "default-service-account"
+    'random/repo':
+      timeout: 2h
+      grace_period: 15s
+      utility_images:
+        clonerefs: "clonerefs:random"
+        initupload: "initupload:random"
+        entrypoint: "entrypoint:random"
+        sidecar: "sidecar:org"
+      gcs_configuration:
+        bucket: "ignore"
+        path_strategy: "legacy"
+        default_org: "random"
+        default_repo: "repo"
+      gcs_credentials_secret: "random-service-account"
+
+periodics:
+- name: kubernetes-defaulted-decoration
+  interval: 1h
+  decorate: true
+  spec:
+    containers:
+    - image: golang:latest
+      args:
+      - "test"
+      - "./..."`,
+			expected: &prowapi.DecorationConfig{
+				Timeout:     &prowapi.Duration{Duration: 2 * time.Hour},
+				GracePeriod: &prowapi.Duration{Duration: 15 * time.Second},
+				UtilityImages: &prowapi.UtilityImages{
+					CloneRefs:  "clonerefs:default",
+					InitUpload: "initupload:default",
+					Entrypoint: "entrypoint:default",
+					Sidecar:    "sidecar:default",
+				},
+				GCSConfiguration: &prowapi.GCSConfiguration{
+					Bucket:       "default-bucket",
+					PathStrategy: prowapi.PathStrategyLegacy,
+					DefaultOrg:   "kubernetes",
+					DefaultRepo:  "kubernetes",
+				},
+				GCSCredentialsSecret: pStr("default-service-account"),
+			},
+		},
+		{
 			name: "with default, no explicit decorate",
 			rawConfig: `
 plank:
@@ -3162,6 +3226,148 @@ postsubmits:
 			if tc.verify != nil {
 				if err := tc.verify(cfg); err != nil {
 					t.Fatalf("verify failed:  %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestReadJobConfigProwIgnore(t *testing.T) {
+	expectExactly := func(expected ...string) func(c *JobConfig) error {
+		return func(c *JobConfig) error {
+			expected := sets.NewString(expected...)
+			actual := sets.NewString()
+			for _, pres := range c.PresubmitsStatic {
+				for _, pre := range pres {
+					actual.Insert(pre.Name)
+				}
+			}
+			if diff := expected.Difference(actual); diff.Len() > 0 {
+				return fmt.Errorf("missing expected job(s): %q", diff.List())
+			}
+			if diff := actual.Difference(expected); diff.Len() > 0 {
+				return fmt.Errorf("found unexpected job(s): %q", diff.List())
+			}
+			return nil
+		}
+	}
+	commonFiles := map[string]string{
+		"foo_jobs.yaml": `presubmits:
+  org/foo:
+  - name: foo_1
+    spec:
+      containers:
+      - image: my-image:latest
+        command: ["do-the-thing"]`,
+		"bar_jobs.yaml": `presubmits:
+  org/bar:
+  - name: bar_1
+    spec:
+      containers:
+      - image: my-image:latest
+        command: ["do-the-thing"]`,
+		"subdir/baz_jobs.yaml": `presubmits:
+  org/baz:
+  - name: baz_1
+    spec:
+      containers:
+      - image: my-image:latest
+        command: ["do-the-thing"]`,
+		"extraneous.md": `I am unrelated.`,
+	}
+
+	var testCases = []struct {
+		name   string
+		files  map[string]string
+		verify func(*JobConfig) error
+	}{
+		{
+			name:   "no ignore files",
+			verify: expectExactly("foo_1", "bar_1", "baz_1"),
+		},
+		{
+			name: "ignore file present, all ignored",
+			files: map[string]string{
+				ProwIgnoreFileName: `*.yaml`,
+			},
+			verify: expectExactly(),
+		},
+		{
+			name: "ignore file present, no match",
+			files: map[string]string{
+				ProwIgnoreFileName: `*_ignored.yaml`,
+			},
+			verify: expectExactly("foo_1", "bar_1", "baz_1"),
+		},
+		{
+			name: "ignore file present, matches bar file",
+			files: map[string]string{
+				ProwIgnoreFileName: `bar_*.yaml`,
+			},
+			verify: expectExactly("foo_1", "baz_1"),
+		},
+		{
+			name: "ignore file present, matches subdir",
+			files: map[string]string{
+				ProwIgnoreFileName: `subdir/`,
+			},
+			verify: expectExactly("foo_1", "bar_1"),
+		},
+		{
+			name: "ignore file present, matches bar and subdir",
+			files: map[string]string{
+				ProwIgnoreFileName: `subdir/
+bar_jobs.yaml`,
+			},
+			verify: expectExactly("foo_1"),
+		},
+		{
+			name: "ignore file in subdir, matches only subdir files",
+			files: map[string]string{
+				"subdir/" + ProwIgnoreFileName: `*.yaml`,
+			},
+			verify: expectExactly("foo_1", "bar_1"),
+		},
+		{
+			name: "ignore file in root and subdir, matches bar and subdir",
+			files: map[string]string{
+				"subdir/" + ProwIgnoreFileName: `*.yaml`,
+				ProwIgnoreFileName:             `bar_jobs.yaml`,
+			},
+			verify: expectExactly("foo_1"),
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			jobConfigDir, err := ioutil.TempDir("", "jobConfig")
+			if err != nil {
+				t.Fatalf("fail to make tempdir: %v", err)
+			}
+			defer os.RemoveAll(jobConfigDir)
+			err = os.Mkdir(filepath.Join(jobConfigDir, "subdir"), 0777)
+			if err != nil {
+				t.Fatalf("fail to make subdir: %v", err)
+			}
+
+			for _, fileMap := range []map[string]string{commonFiles, tc.files} {
+				for name, content := range fileMap {
+					fullName := filepath.Join(jobConfigDir, name)
+					if err := ioutil.WriteFile(fullName, []byte(content), 0666); err != nil {
+						t.Fatalf("fail to write file %s: %v", fullName, err)
+					}
+				}
+			}
+
+			cfg, err := ReadJobConfig(jobConfigDir)
+			if err != nil {
+				t.Fatalf("Unexpected error reading job config: %v.", err)
+			}
+
+			if tc.verify != nil {
+				if err := tc.verify(&cfg); err != nil {
+					t.Errorf("Verify failed:  %v", err)
 				}
 			}
 		})

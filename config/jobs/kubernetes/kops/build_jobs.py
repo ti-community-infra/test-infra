@@ -33,7 +33,9 @@ from helpers import ( # pylint: disable=import-error, no-name-in-module
 skip_jobs = [
 ]
 
-image = "gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master"
+image = "gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master"
+
+loader = jinja2.FileSystemLoader(searchpath="./templates")
 
 ##############
 # Build Test #
@@ -79,6 +81,8 @@ def build_test(cloud='aws',
         return None
     if should_skip_newer_k8s(k8s_version, kops_version):
         return None
+    if container_runtime == 'docker' and k8s_version not in ('1.21', '1.22', '1.23'):
+        return None
 
     if cloud == 'aws':
         kops_image = distro_images[distro]
@@ -117,6 +121,13 @@ def build_test(cloud='aws',
     marker, k8s_deploy_url, test_package_bucket, test_package_dir = k8s_version_info(k8s_version)
     args = create_args(kops_channel, networking, container_runtime, extra_flags, kops_image)
 
+    node_ig_overrides = ""
+    cp_ig_overrides = ""
+    if distro == "flatcar":
+        # https://github.com/flatcar-linux/Flatcar/issues/220
+        node_ig_overrides += "spec.instanceMetadata.httpTokens=optional"
+        cp_ig_overrides += "spec.instanceMetadata.httpTokens=optional"
+
     if tab in skip_jobs:
         return None
 
@@ -137,7 +148,6 @@ def build_test(cloud='aws',
         if irsa and cloud == "aws":
             env['KOPS_IRSA'] = "true"
 
-    loader = jinja2.FileSystemLoader(searchpath="./templates")
     tmpl = jinja2.Environment(loader=loader).get_template(tmpl_file)
     job = tmpl.render(
         job_name=job_name,
@@ -146,6 +156,8 @@ def build_test(cloud='aws',
         kops_ssh_user=kops_ssh_user,
         kops_ssh_key_path=kops_ssh_key_path,
         create_args=args,
+        cp_ig_overrides=cp_ig_overrides,
+        node_ig_overrides=node_ig_overrides,
         k8s_deploy_url=k8s_deploy_url,
         kops_deploy_url=kops_deploy_url,
         test_parallelism=str(test_parallelism),
@@ -271,7 +283,6 @@ def presubmit_test(branch='master',
         if irsa and cloud == "aws":
             env['KOPS_IRSA'] = "true"
 
-    loader = jinja2.FileSystemLoader(searchpath="./templates")
     tmpl = jinja2.Environment(loader=loader).get_template(tmpl_file)
     job = tmpl.render(
         job_name=name,
@@ -422,7 +433,9 @@ def generate_grid():
                                        k8s_version=k8s_version,
                                        kops_version=kops_version,
                                        networking=networking,
-                                       container_runtime=container_runtime)
+                                       container_runtime=container_runtime,
+                                       extra_flags=["--gce-service-account=default"], # Workaround for test-infra#24747 # pylint: disable=line-too-long
+                                      )
                         )
 
     return filter(None, results)
@@ -657,6 +670,15 @@ def generate_misc():
                    template_path="/home/prow/go/src/k8s.io/kops/tests/e2e/templates/apiserver.yaml.tmpl", # pylint: disable=line-too-long
                    extra_dashboards=['kops-misc'],
                    feature_flags=['APIServerNodes']),
+
+        build_test(name_override="kops-aws-misc-karpenter",
+                   k8s_version="ci",
+                   networking="amazonvpc",
+                   kops_channel="alpha",
+                   runs_per_day=1,
+                   extra_flags=["--instance-manager=karpenter"],
+                   feature_flags=['Karpenter'],
+                   extra_dashboards=["kops-misc"]),
 
     ]
     return results
@@ -913,7 +935,7 @@ def generate_presubmits_network_plugins():
 # kops-presubmits-e2e.yaml #
 ############################
 def generate_presubmits_e2e():
-    skip_regex = r'\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[HPA\]|\[Driver:.nfs\]|Dashboard|RuntimeClass|RuntimeHandler' # pylint: disable=line-too-long
+    skip_regex = r'\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]|\[HPA\]|\[Driver:.nfs\]|RuntimeClass|RuntimeHandler' # pylint: disable=line-too-long
     jobs = [
         presubmit_test(
             k8s_version='ci',
@@ -988,6 +1010,7 @@ def generate_presubmits_e2e():
             networking='cilium',
             tab_name='e2e-gce',
             always_run=False,
+            extra_flags=["--gce-service-account=default"], # Workaround for test-infra#24747
         ),
         presubmit_test(
             cloud='gce',
@@ -997,6 +1020,7 @@ def generate_presubmits_e2e():
             networking='cilium',
             tab_name='e2e-gce-ci',
             always_run=False,
+            extra_flags=["--gce-service-account=default"], # Workaround for test-infra#24747
         ),
         presubmit_test(
             cloud='gce',
@@ -1008,6 +1032,7 @@ def generate_presubmits_e2e():
             tab_name='pull-kops-e2e-k8s-gce-calico-u2004-k22-containerd',
             always_run=False,
             feature_flags=['GoogleCloudBucketACL'],
+            extra_flags=["--gce-service-account=default"], # Workaround for test-infra#24747
         ),
         # A special test for AWS Cloud-Controller-Manager
         presubmit_test(
@@ -1118,6 +1143,14 @@ def generate_presubmits_e2e():
             tab_name='e2e-1-21',
             always_run=True,
             skip_regex=skip_regex + "|MetricsGrabber",
+        ),
+        presubmit_test(
+            name="pull-kops-e2e-aws-karpenter",
+            k8s_version="ci",
+            networking="amazonvpc",
+            kops_channel="alpha",
+            extra_flags=["--instance-manager=karpenter"],
+            feature_flags=['Karpenter'],
         )
     ]
     return jobs

@@ -2,6 +2,9 @@ presubmits:
   kubernetes-sigs/cluster-api-provider-ibmcloud:
   - name: pull-cluster-api-provider-ibmcloud-make
     always_run: true
+    branches:
+      # The script this job runs is not in all branches.
+      - ^main$
     decorate: true
     path_alias: sigs.k8s.io/cluster-api-provider-ibmcloud
     labels:
@@ -15,7 +18,7 @@ presubmits:
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
-        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-1.21
+        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master
         imagePullPolicy: Always
         resources:
           requests:
@@ -25,13 +28,16 @@ presubmits:
       testgrid-tab-name: pr-make
   - name: pull-cluster-api-provider-ibmcloud-test
     always_run: true
+    branches:
+      # The script this job runs is not in all branches.
+      - ^main$
     decorate: true
     path_alias: sigs.k8s.io/cluster-api-provider-ibmcloud
     labels:
       preset-service-account: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-1.21
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master
         imagePullPolicy: Always
         command:
         - "./scripts/ci-test.sh"
@@ -40,12 +46,15 @@ presubmits:
       testgrid-tab-name: pr-test
   - name: pull-cluster-api-provider-ibmcloud-build
     always_run: true
+    branches:
+      # The script this job runs is not in all branches.
+      - ^main$
     optional: false
     decorate: true
     path_alias: sigs.k8s.io/cluster-api-provider-ibmcloud
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-1.21
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master
         command:
         - "./scripts/ci-build.sh"
         resources:
@@ -65,7 +74,7 @@ presubmits:
     path_alias: "sigs.k8s.io/cluster-api-provider-ibmcloud"
     spec:
       containers:
-        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-1.21
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master
           command:
             - "make"
             - "verify"

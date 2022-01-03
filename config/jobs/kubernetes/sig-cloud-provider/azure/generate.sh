@@ -38,7 +38,7 @@ EOF
 }
 
 # we need to define the full image URL so it can be autobumped
-tmp="gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211210-0c6ec8feca-master"
+tmp="gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master"
 kubekins_e2e_image="${tmp/\-master/}"
 installCSIdrivers=""
 
@@ -77,7 +77,7 @@ presubmits:
     extra_refs:
       - org: kubernetes-sigs
         repo: cluster-api-provider-azure
-        base_ref: release-0.5
+        base_ref: v1.0.1
         path_alias: sigs.k8s.io/cluster-api-provider-azure
         workdir: true
       - org: kubernetes-sigs
@@ -122,7 +122,7 @@ $(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-capz-azure-disk)
     extra_refs:
       - org: kubernetes-sigs
         repo: cluster-api-provider-azure
-        base_ref: release-0.5
+        base_ref: v1.0.1
         path_alias: sigs.k8s.io/cluster-api-provider-azure
         workdir: true
       - org: kubernetes-sigs
@@ -169,7 +169,7 @@ $(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-capz-azure-disk-v
     extra_refs:
       - org: kubernetes-sigs
         repo: cluster-api-provider-azure
-        base_ref: release-0.5
+        base_ref: v1.0.1
         path_alias: sigs.k8s.io/cluster-api-provider-azure
         workdir: true
       - org: kubernetes-sigs
@@ -215,7 +215,7 @@ $(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-capz-azure-file)
     extra_refs:
       - org: kubernetes-sigs
         repo: cluster-api-provider-azure
-        base_ref: release-0.5
+        base_ref: v1.0.1
         path_alias: sigs.k8s.io/cluster-api-provider-azure
         workdir: true
       - org: kubernetes-sigs
@@ -263,7 +263,7 @@ $(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-capz-azure-file-v
     extra_refs:
     - org: kubernetes-sigs
       repo: cluster-api-provider-azure
-      base_ref: release-0.5
+      base_ref: v1.0.1
       path_alias: sigs.k8s.io/cluster-api-provider-azure
       workdir: true
     spec:

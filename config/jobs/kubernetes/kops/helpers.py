@@ -105,18 +105,17 @@ def create_args(kops_channel, networking, container_runtime, extra_flags, kops_i
     if container_runtime:
         args += f" --container-runtime={container_runtime}"
 
-    if kops_image:
-        image_overridden = False
-        if extra_flags:
-            for arg in extra_flags:
-                if "--image=" in arg:
-                    image_overridden = True
-                args = args + " " + arg
-        if not image_overridden:
-            args = f"--image='{kops_image}' {args}"
+    image_overridden = False
+    if extra_flags:
+        for arg in extra_flags:
+            if "--image=" in arg:
+                image_overridden = True
+            args = args + " " + arg
+    if kops_image and not image_overridden:
+        args = f"--image='{kops_image}' {args}"
     return args.strip()
 
-def latest_aws_image(owner, name):
+def latest_aws_image(owner, name, arm64=False):
     client = boto3.client('ec2', region_name='us-east-1')
     response = client.describe_images(
         Owners=[owner],
@@ -125,6 +124,12 @@ def latest_aws_image(owner, name):
                 'Name': 'name',
                 'Values': [
                     name,
+                ],
+            },
+            {
+                'Name': 'architecture',
+                'Values': [
+                    'arm64' if arm64 else 'x86_64',
                 ],
             },
         ],
@@ -141,10 +146,10 @@ distro_images = {
     'deb11': latest_aws_image('136693071363', 'debian-11-amd64-*'),
     'flatcar': latest_aws_image('075585003325', 'Flatcar-stable-*-hvm'),
     'rhel7': latest_aws_image('309956199498', 'RHEL-7.*_HVM_*-x86_64-0-Hourly2-GP2'),
-    'rhel8': latest_aws_image('309956199498', 'RHEL-8.4.*_HVM-*-x86_64-0-Hourly2-GP2'),
+    'rhel8': latest_aws_image('309956199498', 'RHEL-8.*_HVM-*-x86_64-0-Hourly2-GP2'),
     'u1804': latest_aws_image('099720109477', 'ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-*'), # pylint: disable=line-too-long
     'u2004': latest_aws_image('099720109477', 'ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*'), # pylint: disable=line-too-long
-    'u2004arm64': latest_aws_image('099720109477', 'ubuntu/images/hvm-ssd/ubuntu-focal-20.04-arm64-server-*'), # pylint: disable=line-too-long
+    'u2004arm64': latest_aws_image('099720109477', 'ubuntu/images/hvm-ssd/ubuntu-focal-20.04-arm64-server-*', True), # pylint: disable=line-too-long
     'u2110': latest_aws_image('099720109477', 'ubuntu/images/hvm-ssd/ubuntu-impish-21.10-amd64-server-*'), # pylint: disable=line-too-long
     'u2204': latest_aws_image('099720109477', 'ubuntu/images-testing/hvm-ssd/ubuntu-jammy-daily-amd64-server-*'), # pylint: disable=line-too-long
 }
