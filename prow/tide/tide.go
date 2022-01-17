@@ -837,6 +837,7 @@ func (pr PullRequest) NormalizeCoAuthorBy() []github.CoAuthor {
 	}
 
 	authors := make([]github.CommitAuthor, 0)
+	commitMessages := make([]string, 0)
 	for _, node := range commitNodes {
 		// Convert graphql node to rest api object.
 		commitAuthor := github.CommitAuthor{}
@@ -846,11 +847,13 @@ func (pr PullRequest) NormalizeCoAuthorBy() []github.CoAuthor {
 			login := string(node.Commit.Author.User.Login)
 			commitAuthor.Login = &login
 		}
-
 		authors = append(authors, commitAuthor)
+
+		// Extract the commit message.
+		commitMessages = append(commitMessages, string(node.Commit.Message))
 	}
 
-	return github.NormalizeCoAuthorBy(authors, prAuthorLogin)
+	return github.NormalizeCoAuthorBy(authors, commitMessages, prAuthorLogin)
 }
 
 // isPassingTests returns whether or not all contexts set on the PR except for
