@@ -17,13 +17,13 @@ func TestNormalizeSignedOff(t *testing.T) {
 		{
 			name: "single commit message with signed-off",
 			commitMessages: []string{
-				"commit message headline 1\n\nSigned-off-by: Zhang San <zhangsan@gmail.com>",
+				"commit message headline 1\n\nSigned-off-by: Zhang San <zhang-san@gmail.com>",
 			},
 
 			expectSignedAuthors: []SignedAuthor{
 				{
 					Name:  "Zhang San",
-					Email: "zhangsan@gmail.com",
+					Email: "zhang-san@gmail.com",
 				},
 			},
 		},
