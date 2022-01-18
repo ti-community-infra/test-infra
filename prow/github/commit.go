@@ -8,9 +8,12 @@ import (
 )
 
 const (
-	signOffRegexp      = `(?im)^Signed-off-by:\s*(?P<sign_name>\S+)\s*<(?P<sign_email>\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*)>$`
-	signNameGroupName  = "sign_name"
-	signEmailGroupName = "sign_email"
+	signOffRegexp          = `(?im)^Signed-off-by: (?P<sign_name>.*) <(?P<sign_email>\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*)>$`
+	signNameGroupName      = "sign_name"
+	signEmailGroupName     = "sign_email"
+	coAuthorRegexp         = `(?im)^Co-authored-by: (?P<co_author_name>.*) <(?P<co_author_email>\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*)>$`
+	coAuthorNameGroupName  = "co_author_name"
+	coAuthorEmailGroupName = "co_author_email"
 )
 
 type SignedAuthor struct {
@@ -59,10 +62,11 @@ func NormalizeSignedOffBy(commitMessages []string) []SignedAuthor {
 	return signedAuthors
 }
 
-func NormalizeCoAuthorBy(commitAuthors []CommitAuthor, prAuthorLogin string) []CoAuthor {
+func NormalizeCoAuthorBy(commitAuthors []CommitAuthor, commitMessages []string, prAuthorLogin string) []CoAuthor {
 	coAuthorSet := sets.String{}
 	coAuthors := make([]CoAuthor, 0)
 
+	// Get co-author information based on commit author information.
 	for _, author := range commitAuthors {
 		name := strings.TrimSpace(author.Name)
 		email := strings.TrimSpace(author.Email)
@@ -83,6 +87,36 @@ func NormalizeCoAuthorBy(commitAuthors []CommitAuthor, prAuthorLogin string) []C
 				Email: email,
 			})
 		}
+	}
+
+	// Get co-author information based on the `Co-authored-by:` text in the commit message.
+	combineMessage := strings.Join(commitMessages, "\n\n")
+	compile := regexp.MustCompile(coAuthorRegexp)
+	submatches := compile.FindAllStringSubmatch(combineMessage, -1)
+	groupNames := compile.SubexpNames()
+
+	for _, matches := range submatches {
+		coAuthorName := ""
+		coAuthorEmail := ""
+		for i, match := range matches {
+			groupName := groupNames[i]
+			if groupName == coAuthorNameGroupName {
+				coAuthorName = match
+			} else if groupName == coAuthorEmailGroupName {
+				coAuthorEmail = match
+			}
+		}
+
+		key := getAuthorKey(coAuthorName, coAuthorEmail)
+		if coAuthorSet.Has(key) {
+			continue
+		}
+
+		coAuthorSet.Insert(key)
+		coAuthors = append(coAuthors, CoAuthor{
+			Name:  coAuthorName,
+			Email: coAuthorEmail,
+		})
 	}
 
 	return coAuthors

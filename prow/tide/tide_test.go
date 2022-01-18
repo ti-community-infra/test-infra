@@ -3162,6 +3162,35 @@ func TestPrepareMergeDetails(t *testing.T) {
 		},
 	}
 
+	commitTempalteCombineAllFunc := `
+		{{- $body := print .Body -}}
+
+		{{- $issueNumberLine := .ExtractContent "(?im)^Issue Number:.+" $body -}}
+		{{- $numbers := .NormalizeIssueNumbers $issueNumberLine -}}
+		{{- range $index, $number := $numbers -}}
+			{{- if $index }}, {{ end -}}
+			{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
+		{{- end -}}
+
+		{{- $description := .ExtractContent "(?i)\x60\x60\x60commit-message(?P<content>[\\w|\\W]+)\x60\x60\x60" $body -}}
+		{{- if $description -}}{{- "\n\n" -}}{{- end -}}
+		{{- $description -}}
+
+		{{- $signedAuthors := .NormalizeSignedOffBy -}}
+		{{- if $signedAuthors -}}{{- "\n\n" -}}{{- end -}}
+		{{- range $index, $author := $signedAuthors -}}
+			{{- if $index -}}{{- "\n" -}}{{- end -}}
+			{{- "Signed-off-by:" }} {{ .Name }} <{{- .Email -}}>
+		{{- end -}}
+
+		{{- $coAuthors := .NormalizeCoAuthorBy -}}
+		{{- if $coAuthors -}}{{- "\n\n" -}}{{- end -}}
+		{{- range $index, $author := $coAuthors -}}
+			{{- if $index -}}{{- "\n" -}}{{- end -}}
+			{{- "Co-authored-by:" }} {{ .Name }} <{{- .Email -}}>
+		{{- end -}}
+	`
+
 	testCases := []struct {
 		name        string
 		tpl         config.TideMergeCommitTemplate
@@ -3785,34 +3814,7 @@ func TestPrepareMergeDetails(t *testing.T) {
 		name: "combine all the func",
 		tpl: config.TideMergeCommitTemplate{
 			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
-			Body: getTemplate("CommitBody", `
-				{{- $body := print .Body -}}
-
-				{{- $issueNumberLine := .ExtractContent "(?im)^Issue Number:.+" $body -}}
-				{{- $numbers := .NormalizeIssueNumbers $issueNumberLine -}}
-				{{- range $index, $number := $numbers -}}
-					{{- if $index }}, {{ end -}}
-					{{- .AssociatePrefix }} {{ .Org -}}/{{- .Repo -}}#{{- .Number -}}
-				{{- end -}}
-
-				{{- $description := .ExtractContent "(?i)\x60\x60\x60commit-message(?P<content>[\\w|\\W]+)\x60\x60\x60" $body -}}
-				{{- if $description -}}{{- "\n\n" -}}{{- end -}}
-				{{- $description -}}
-
-				{{- $signedAuthors := .NormalizeSignedOffBy -}}
-				{{- if $signedAuthors -}}{{- "\n\n" -}}{{- end -}}
-				{{- range $index, $author := $signedAuthors -}}
-					{{- if $index -}}{{- "\n" -}}{{- end -}}
-					{{- "Signed-off-by:" }} {{ .Name }} <{{- .Email -}}>
-				{{- end -}}
-
-				{{- $coAuthors := .NormalizeCoAuthorBy -}}
-				{{- if $coAuthors -}}{{- "\n\n" -}}{{- end -}}
-				{{- range $index, $author := $coAuthors -}}
-					{{- if $index -}}{{- "\n" -}}{{- end -}}
-					{{- "Co-authored-by:" }} {{ .Name }} <{{- .Email -}}>
-				{{- end -}}
-			`),
+			Body:  getTemplate("CommitBody", commitTempalteCombineAllFunc),
 		},
 		pr: PullRequest{
 			Number:     githubql.Int(1),
@@ -3878,6 +3880,79 @@ two line.
 Signed-off-by: foo <foo.bar@gmail.com>
 Signed-off-by: zhangsan <zhangsan@gmail.com>
 Signed-off-by: wangwu <wangwu@gmail.com>
+
+Co-authored-by: zhangsan <zhangsan@gmail.com>
+Co-authored-by: wangwu <wangwu@gmail.com>`,
+		},
+	}, {
+		name: "one commit is suggested by co-author but not committed by co-author",
+		tpl: config.TideMergeCommitTemplate{
+			Title: getTemplate("CommitTitle", "{{ .Title }} (#{{ .Number }})"),
+			Body:  getTemplate("CommitBody", commitTempalteCombineAllFunc),
+		},
+		pr: PullRequest{
+			Number:     githubql.Int(1),
+			Mergeable:  githubql.MergeableStateMergeable,
+			HeadRefOID: githubql.String("SHA"),
+			Repository: repository,
+			Title:      "my commit title",
+			Body:       "## Title\r\n\r\nIssue Number: close #123, ref tikv/tikv#456\r\n\r\nWhat's changed?\r\n\x60\x60\x60commit-message\r\none line.\ntwo line.\r\n\x60\x60\x60\r\n",
+			Author: User{
+				Login: "foo",
+			},
+			Commits: struct{ Nodes []struct{ Commit Commit } }{
+				Nodes: []struct{ Commit Commit }{
+					{
+						Commit: Commit{
+							Message: "commit message headline 1\n\nSigned-off-by: foo <foo.bar@gmail.com>",
+							Author: Author{
+								Email: "foo.bar@gmail.com",
+								Name:  "foo",
+								User: User{
+									Login: "foo",
+								},
+							},
+						},
+					},
+					{
+						Commit: Commit{
+							Message: "commit message headline 2\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>",
+							Author: Author{
+								Email: "zhangsan@gmail.com",
+								Name:  "zhangsan",
+								User: User{
+									Login: "zhangsan",
+								},
+							},
+						},
+					},
+					{
+						Commit: Commit{
+							Message: "commit message headline 3\n\nSigned-off-by: foo <foo.bar@gmail.com>n\nCo-authored-by: wangwu <wangwu@gmail.com>",
+							Author: Author{
+								Email: "foo.bar@gmail.com",
+								Name:  "foo",
+								User: User{
+									Login: "foo",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		mergeMethod: "merge",
+		expected: github.MergeDetails{
+			SHA:         "SHA",
+			MergeMethod: "merge",
+			CommitTitle: "my commit title (#1)",
+			CommitMessage: `close pingcap/tidb#123, ref tikv/tikv#456
+
+one line.
+two line.
+
+Signed-off-by: foo <foo.bar@gmail.com>
+Signed-off-by: zhangsan <zhangsan@gmail.com>
 
 Co-authored-by: zhangsan <zhangsan@gmail.com>
 Co-authored-by: wangwu <wangwu@gmail.com>`,

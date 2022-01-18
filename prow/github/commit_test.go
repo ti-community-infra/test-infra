@@ -17,13 +17,13 @@ func TestNormalizeSignedOff(t *testing.T) {
 		{
 			name: "single commit message with signed-off",
 			commitMessages: []string{
-				"commit message headline 1\n\nSigned-off-by: foo <foo.bar@gmail.com>",
+				"commit message headline 1\n\nSigned-off-by: Zhang San <zhang-san@gmail.com>",
 			},
 
 			expectSignedAuthors: []SignedAuthor{
 				{
-					Name:  "foo",
-					Email: "foo.bar@gmail.com",
+					Name:  "Zhang San",
+					Email: "zhang-san@gmail.com",
 				},
 			},
 		},
@@ -117,9 +117,10 @@ func TestNormalizeCoAuthorBy(t *testing.T) {
 	testLogin3 := "login3"
 
 	testcases := []struct {
-		name          string
-		commitAuthors []CommitAuthor
-		prAuthorLogin string
+		name           string
+		commitAuthors  []CommitAuthor
+		commitMessages []string
+		prAuthorLogin  string
 
 		expectCoAuthors []CoAuthor
 	}{
@@ -127,15 +128,19 @@ func TestNormalizeCoAuthorBy(t *testing.T) {
 			name: "all commits are from the PR author",
 			commitAuthors: []CommitAuthor{
 				{
-					Name:  "zhangsan",
-					Email: "zhangsan@email.com",
+					Name:  "Zhang San",
+					Email: "zhangsan@gmail.com",
 					Login: &testLogin1,
 				},
 				{
-					Name:  "zhangsan",
-					Email: "zhangsan@email.com",
+					Name:  "Zhang San",
+					Email: "zhangsan@gmail.com",
 					Login: &testLogin1,
 				},
+			},
+			commitMessages: []string{
+				"commit message headline 1\n\nSigned-off-by: Zhang San <zhangsan@gmail.com>",
+				"commit message headline 2\n\nSigned-off-by: Zhang san <zhangsan@gmail.com>",
 			},
 			prAuthorLogin: testLogin1,
 
@@ -146,21 +151,25 @@ func TestNormalizeCoAuthorBy(t *testing.T) {
 			commitAuthors: []CommitAuthor{
 				{
 					Name:  "zhangsan",
-					Email: "zhangsan@email.com",
+					Email: "zhangsan@gmail.com",
 					Login: &testLogin1,
 				},
 				{
 					Name:  "lisi",
-					Email: "lisi@email.com",
+					Email: "lisi@gmail.com",
 					Login: &testLogin2,
 				},
+			},
+			commitMessages: []string{
+				"commit message headline 1\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>",
+				"commit message headline 2\n\nSigned-off-by: lisi <lisi@gmail.com>\nCo-authored-by: lisi <lisi@gmail.com>",
 			},
 			prAuthorLogin: testLogin1,
 
 			expectCoAuthors: []CoAuthor{
 				{
 					Name:  "lisi",
-					Email: "lisi@email.com",
+					Email: "lisi@gmail.com",
 				},
 			},
 		},
@@ -169,26 +178,31 @@ func TestNormalizeCoAuthorBy(t *testing.T) {
 			commitAuthors: []CommitAuthor{
 				{
 					Name:  "zhangsan",
-					Email: "zhangsan@email.com",
+					Email: "zhangsan@gmail.com",
 					Login: &testLogin1,
 				},
 				{
 					Name:  "lisi",
-					Email: "lisi@email.com",
+					Email: "lisi@gmail.com",
 					Login: &testLogin2,
 				},
 				{
 					Name:  "lisi",
-					Email: "lisi@email.com",
+					Email: "lisi@gmail.com",
 					Login: &testLogin2,
 				},
+			},
+			commitMessages: []string{
+				"commit message headline 1\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>",
+				"commit message headline 2\n\nSigned-off-by: lisi <lisi@gmail.com>\nCo-authored-by: lisi <lisi@gmail.com>",
+				"commit message headline 3\n\nSigned-off-by: lisi <lisi@gmail.com>\nCo-authored-by: lisi <lisi@gmail.com>",
 			},
 			prAuthorLogin: testLogin1,
 
 			expectCoAuthors: []CoAuthor{
 				{
 					Name:  "lisi",
-					Email: "lisi@email.com",
+					Email: "lisi@gmail.com",
 				},
 			},
 		},
@@ -197,30 +211,35 @@ func TestNormalizeCoAuthorBy(t *testing.T) {
 			commitAuthors: []CommitAuthor{
 				{
 					Name:  "zhangsan",
-					Email: "zhangsan@email.com",
+					Email: "zhangsan@gmail.com",
 					Login: &testLogin1,
 				},
 				{
 					Name:  "lisi",
-					Email: "lisi@email.com",
+					Email: "lisi@gmail.com",
 					Login: &testLogin2,
 				},
 				{
 					Name:  "wangwu",
-					Email: "wangwu@email.com",
+					Email: "wangwu@gmail.com",
 					Login: &testLogin3,
 				},
 			},
+			commitMessages: []string{
+				"commit message headline 1\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>",
+				"commit message headline 2\n\nSigned-off-by: lisi <lisi@gmail.com>\nCo-authored-by: lisi <lisi@gmail.com>",
+				"commit message headline 3\n\nSigned-off-by: wangwu <wangwu@gmail.com>\nCo-authored-by: wangwu <wangwu@gmail.com>",
+			},
 			prAuthorLogin: testLogin1,
 
 			expectCoAuthors: []CoAuthor{
 				{
 					Name:  "lisi",
-					Email: "lisi@email.com",
+					Email: "lisi@gmail.com",
 				},
 				{
 					Name:  "wangwu",
-					Email: "wangwu@email.com",
+					Email: "wangwu@gmail.com",
 				},
 			},
 		},
@@ -229,19 +248,50 @@ func TestNormalizeCoAuthorBy(t *testing.T) {
 			commitAuthors: []CommitAuthor{
 				{
 					Name:  "zhangsan",
-					Email: "zhangsan@email.com",
+					Email: "zhangsan@gmail.com",
 				},
 				{
 					Name:  "zhangsan",
-					Email: "zhangsan@email.com",
+					Email: "zhangsan@gmail.com",
 				},
+			},
+			commitMessages: []string{
+				"commit message headline 1\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>\nCo-authored-by: zhangsan <zhangsan@gmail.com>",
+				"commit message headline 2\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>\nCo-authored-by: zhangsan <zhangsan@gmail.com>",
 			},
 			prAuthorLogin: testLogin1,
 
 			expectCoAuthors: []CoAuthor{
 				{
 					Name:  "zhangsan",
-					Email: "zhangsan@email.com",
+					Email: "zhangsan@gmail.com",
+				},
+			},
+		},
+		{
+			name: "one commit suggested by co-another but another by pr author",
+			commitAuthors: []CommitAuthor{
+				{
+					Name:  "zhangsan",
+					Email: "zhangsan@gmail.com",
+					Login: &testLogin1,
+				},
+				{
+					Name:  "zhangsan",
+					Email: "zhangsan@gmail.com",
+					Login: &testLogin1,
+				},
+			},
+			commitMessages: []string{
+				"commit message headline 1\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>",
+				"commit message headline 2\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>\nCo-authored-by: lisi <lisi@gmail.com>",
+			},
+			prAuthorLogin: testLogin1,
+
+			expectCoAuthors: []CoAuthor{
+				{
+					Name:  "lisi",
+					Email: "lisi@gmail.com",
 				},
 			},
 		},
@@ -249,7 +299,7 @@ func TestNormalizeCoAuthorBy(t *testing.T) {
 
 	for _, testcase := range testcases {
 		tc := testcase
-		actualCoAuthors := NormalizeCoAuthorBy(tc.commitAuthors, tc.prAuthorLogin)
+		actualCoAuthors := NormalizeCoAuthorBy(tc.commitAuthors, tc.commitMessages, tc.prAuthorLogin)
 
 		sortCoAuthors(actualCoAuthors)
 		sortCoAuthors(tc.expectCoAuthors)
