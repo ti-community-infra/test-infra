@@ -17,13 +17,13 @@ func TestNormalizeSignedOff(t *testing.T) {
 		{
 			name: "single commit message with signed-off",
 			commitMessages: []string{
-				"commit message headline 1\n\nSigned-off-by: foo <foo.bar@gmail.com>",
+				"commit message headline 1\n\nSigned-off-by: Zhang San <zhangsan@gmail.com>",
 			},
 
 			expectSignedAuthors: []SignedAuthor{
 				{
-					Name:  "foo",
-					Email: "foo.bar@gmail.com",
+					Name:  "Zhang San",
+					Email: "zhangsan@gmail.com",
 				},
 			},
 		},
@@ -128,19 +128,19 @@ func TestNormalizeCoAuthorBy(t *testing.T) {
 			name: "all commits are from the PR author",
 			commitAuthors: []CommitAuthor{
 				{
-					Name:  "zhangsan",
+					Name:  "Zhang San",
 					Email: "zhangsan@gmail.com",
 					Login: &testLogin1,
 				},
 				{
-					Name:  "zhangsan",
+					Name:  "Zhang San",
 					Email: "zhangsan@gmail.com",
 					Login: &testLogin1,
 				},
 			},
 			commitMessages: []string{
-				"commit message headline 1\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>",
-				"commit message headline 2\n\nSigned-off-by: zhangsan <zhangsan@gmail.com>",
+				"commit message headline 1\n\nSigned-off-by: Zhang San <zhangsan@gmail.com>",
+				"commit message headline 2\n\nSigned-off-by: Zhang san <zhangsan@gmail.com>",
 			},
 			prAuthorLogin: testLogin1,
 
