@@ -234,7 +234,7 @@ func TestFailedJobs(t *testing.T) {
 			pj.Status.URL = "whatever"
 			pjs = append(pjs, &pj)
 		}
-		return reporter.GenerateReport(pjs).String()
+		return reporter.GenerateReport(pjs, 0).String()
 	}
 
 	cases := []struct {
@@ -1281,7 +1281,7 @@ func TestDeckLinkForPR(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := deckLinkForPR(tc.deckURL, tc.refs, tc.changeStatus)
 			if err != nil {
-				t.Errorf("unexpected error generating Deck link: %w", err)
+				t.Errorf("unexpected error generating Deck link: %v", err)
 			}
 			if result != tc.expected {
 				t.Errorf("expected deck link %s, but got %s", tc.expected, result)

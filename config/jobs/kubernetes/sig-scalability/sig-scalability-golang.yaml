@@ -34,7 +34,7 @@ periodics:
     testgrid-tab-name: build-and-push-k8s-at-golang-tip
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/bootstrap:v20211008-e0e089cfce
+    - image: gcr.io/k8s-staging-test-infra/bootstrap:v20220121-8b2d5086e4
       command:
       - runner.sh
       - /workspace/scenarios/execute.py
@@ -83,7 +83,7 @@ periodics:
     testgrid-tab-name: golang-tip-k8s-1-23
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py

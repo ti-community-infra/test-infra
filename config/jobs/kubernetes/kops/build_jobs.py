@@ -16,8 +16,8 @@ import hashlib
 import math
 import json
 import re
-import jinja2 # pylint: disable=import-error
 import yaml
+import jinja2 # pylint: disable=import-error
 
 
 from helpers import ( # pylint: disable=import-error, no-name-in-module
@@ -33,7 +33,7 @@ from helpers import ( # pylint: disable=import-error, no-name-in-module
 skip_jobs = [
 ]
 
-image = "gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master"
+image = "gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-master"
 
 loader = jinja2.FileSystemLoader(searchpath="./templates")
 
@@ -411,7 +411,7 @@ def generate_grid():
                                        k8s_version=k8s_version,
                                        kops_version=kops_version,
                                        networking=networking,
-                                       irsa=k8s_version >= '1.22',
+                                       irsa=False,
                                        container_runtime=container_runtime)
                         )
 
@@ -673,7 +673,7 @@ def generate_misc():
 
         build_test(name_override="kops-aws-misc-karpenter",
                    k8s_version="ci",
-                   networking="amazonvpc",
+                   networking="cilium",
                    kops_channel="alpha",
                    runs_per_day=1,
                    extra_flags=["--instance-manager=karpenter"],
@@ -780,7 +780,7 @@ def generate_upgrades():
     versions_list = [
         #  kops    k8s          kops      k8s
         (('1.22', 'v1.22.4'), ('1.23', 'v1.23.0')),
-        (('1.22', 'v1.22.4'), ('latest', '1.23.0')),
+        (('1.22', 'v1.22.4'), ('latest', 'v1.23.0')),
         (('1.23', 'v1.23.0'), ('latest', 'latest')),
         (('latest', 'v1.23.0'), ('latest', 'latest')),
         (('latest', 'v1.22.4'), ('latest', 'v1.23.0')),
@@ -836,11 +836,10 @@ def generate_versions():
             publish_version_marker='gs://kops-ci/bin/latest-ci-green.txt',
         )
     ]
-    for version in ['1.23', '1.22', '1.21', '1.20', '1.19', '1.18']:
-        distro = 'deb9' if version == '1.17' else 'u2004'
+    for version in ['1.23', '1.22', '1.21', '1.20', '1.19']:
         results.append(
             build_test(
-                distro=distro,
+                distro='u2004',
                 k8s_version=version,
                 irsa=version >= '1.22',
                 kops_channel='alpha',
@@ -1147,7 +1146,7 @@ def generate_presubmits_e2e():
         presubmit_test(
             name="pull-kops-e2e-aws-karpenter",
             k8s_version="ci",
-            networking="amazonvpc",
+            networking="cilium",
             kops_channel="alpha",
             extra_flags=["--instance-manager=karpenter"],
             feature_flags=['Karpenter'],

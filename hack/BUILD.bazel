@@ -1,17 +1,6 @@
-load("@py3_deps//:requirements.bzl", "requirement")
 load("@build_bazel_rules_nodejs//:index.bzl", "nodejs_binary", "nodejs_test")
 
 package(default_visibility = ["//visibility:public"])
-
-py_test(
-    name = "coalesce_test",
-    size = "small",
-    srcs = [
-        "coalesce.py",
-        "coalesce_test.py",
-    ],
-    python_version = "PY3",
-)
 
 sh_test(
     name = "verify-pylint",
@@ -20,7 +9,7 @@ sh_test(
         ":pylint_bin",
         "//:all-srcs",
     ],
-    tags = ["lint"],
+    tags = ["manual"],
 )
 
 nodejs_test(
@@ -218,12 +207,12 @@ test_suite(
     name = "verify-all",
     tests = [
         ":verify-linters",
-        # Gofmt and golangci-lint have been migrated to make rules, if desired run
+        # Gofmt, golangci-lint, and boilerplate have been migrated to make rules, if desired run
         # bazel test @io_k8s_repo_infra//hack:verify-gofmt
         # bazel test @io_k8s_repo_infra//hack:verify-golangci-lint
+        # bazel test @io_k8s_repo_infra//hack:verify-boilerplate
         # Ref: https://github.com/kubernetes/test-infra/issues/23796
         "@io_k8s_repo_infra//hack:verify-bazel",
-        "@io_k8s_repo_infra//hack:verify-boilerplate",
         "@io_k8s_repo_infra//hack:verify-deps",
     ],
 )
@@ -231,33 +220,6 @@ test_suite(
 test_suite(
     name = "verify-linters",
     tags = ["lint"],  # picks up all non-manual targets with this tag
-)
-
-py_binary(
-    name = "pylint_bin",
-    srcs = ["pylint_bin.py"],
-    python_version = "PY3",
-    tags = ["lint"],
-    # NOTE: this should only contain direct third party imports and pylint
-    deps = [
-        requirement("astroid"),
-        requirement("backports.functools_lru_cache"),
-        requirement("configparser"),
-        requirement("influxdb"),
-        requirement("isort"),
-        requirement("lazy-object-proxy"),
-        requirement("parameterized"),
-        requirement("pylint"),
-        requirement("pytz"),
-        requirement("PyYAML"),
-        requirement("requests"),
-        requirement("setuptools"),
-        requirement("sh"),
-        requirement("singledispatch"),
-        requirement("six"),
-        requirement("wrapt"),
-        requirement("ruamel.yaml"),
-    ],
 )
 
 sh_binary(

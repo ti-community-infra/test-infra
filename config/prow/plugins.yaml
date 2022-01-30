@@ -360,7 +360,8 @@ milestone_applier:
   kubernetes/k8s.io:
     main: v1.24
   kubernetes/kops:
-    master: v1.23
+    master: v1.24
+    release-1.23: v1.23
     release-1.22: v1.22
     release-1.21: v1.21
     release-1.20: v1.20
@@ -369,10 +370,10 @@ milestone_applier:
     release-1.17: v1.17
     release-1.16: v1.16
   kubernetes-sigs/cluster-api:
-    main: v1.1
+    main: v1.2
+    release-1.1: v1.1
     release-1.0: v1.0
     release-0.4: v0.4
-    operator-0.4: v0.4 # Remove this when it gets merged back.
     release-0.3: v0.3
   kubernetes-sigs/cluster-api-provider-aws:
     main: v1.x
@@ -757,9 +758,11 @@ cherry_pick_unapproved:
 
     To merge this cherry pick, it must first be approved (`/lgtm` + `/approve`) by the relevant OWNERS.
 
-    **AFTER** it has been approved by code owners, please ping the **kubernetes/release-managers** team in a comment to request a cherry pick review.
+    **AFTER** it has been approved by code owners, please leave the following comment on a line **by itself, with no leading whitespace**: **/cc kubernetes/release-managers**
 
-    (For details on the patch release process and schedule, see the [Patch Releases](https://k8s.io/releases/patch-releases) page.)
+    (This command will request a cherry pick review from [Release Managers](https://github.com/orgs/kubernetes/teams/release-managers) and should work for all GitHub users, whether they are members of the Kubernetes GitHub organization or not.)
+
+    For details on the patch release process and schedule, see the [Patch Releases](https://k8s.io/releases/patch-releases) page.
 
 # Enabled plugins per repo.
 # Keys: Full repo name: "org/repo".
@@ -1041,6 +1044,8 @@ plugins:
     - milestonestatus
     - release-note
     - require-matching-label
+    - mergecommitblocker
+    - override
 
   kubernetes-sigs/gcp-compute-persistent-disk-csi-driver:
     plugins:
@@ -1148,6 +1153,14 @@ plugins:
     plugins:
     - milestone
 
+  kubernetes-sigs/node-feature-discovery:
+    plugins:
+    - override
+
+  kubernetes-sigs/node-feature-discovery-operator:
+    plugins:
+    - override
+
   containerd/cri:
     plugins:
     - assign
@@ -1228,6 +1241,12 @@ external_plugins:
     events:
       - issue_comment
       - pull_request
+  kubernetes-sigs/cloud-provider-azure:
+  - name: cherrypicker
+    events:
+    - issue_comment
+    - pull_request
+    endpoint: http://cherrypicker
   kubernetes-sigs/cluster-api:
   - name: cherrypicker
     events:
@@ -1259,6 +1278,18 @@ external_plugins:
     - pull_request
     endpoint: http://cherrypicker
   kubernetes-sigs/controller-runtime:
+  - name: cherrypicker
+    events:
+    - issue_comment
+    - pull_request
+    endpoint: http://cherrypicker
+  kubernetes-sigs/node-feature-discovery:
+  - name: cherrypicker
+    events:
+    - issue_comment
+    - pull_request
+    endpoint: http://cherrypicker
+  kubernetes-sigs/node-feature-discovery-operator:
   - name: cherrypicker
     events:
     - issue_comment

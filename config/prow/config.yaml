@@ -11,10 +11,10 @@ plank:
       timeout: 2h
       grace_period: 15m
       utility_images:
-        clonerefs: "gcr.io/k8s-prow/clonerefs:v20211229-d20cd1c87e"
-        initupload: "gcr.io/k8s-prow/initupload:v20211229-d20cd1c87e"
-        entrypoint: "gcr.io/k8s-prow/entrypoint:v20211229-d20cd1c87e"
-        sidecar: "gcr.io/k8s-prow/sidecar:v20211229-d20cd1c87e"
+        clonerefs: "gcr.io/k8s-prow/clonerefs:v20220128-eb56385920"
+        initupload: "gcr.io/k8s-prow/initupload:v20220128-eb56385920"
+        entrypoint: "gcr.io/k8s-prow/entrypoint:v20220128-eb56385920"
+        sidecar: "gcr.io/k8s-prow/sidecar:v20220128-eb56385920"
       gcs_configuration:
         bucket: "kubernetes-jenkins"
         path_strategy: "legacy"
@@ -482,6 +482,10 @@ branch-protection:
           required_status_checks:
             contexts:
             - continuous-integration/travis-ci
+        kubernetes-scheduler-simulator:
+          branches:
+            gh-pages:
+              protect: false
         kubespray:
           required_status_checks:
             contexts:
@@ -515,6 +519,9 @@ branch-protection:
           required_linear_history: true
           required_pull_request_reviews:
             required_approving_review_count: 1
+          restrictions:
+            users:
+            - k8s-ci-robot
 
 tide:
   sync_period: 2m

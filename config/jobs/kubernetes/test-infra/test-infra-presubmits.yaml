@@ -66,7 +66,7 @@ presubmits:
     run_if_changed: '^(config/prow/(config|plugins).yaml$|config/jobs/.*.yaml$)'
     spec:
       containers:
-      - image: gcr.io/k8s-prow/checkconfig:v20211229-d20cd1c87e
+      - image: gcr.io/k8s-prow/checkconfig:v20220128-eb56385920
         command:
         - /checkconfig
         args:
@@ -96,7 +96,7 @@ presubmits:
       preset-kind-volume-mounts: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211208-9473f90198-test-infra
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-test-infra
         command:
         - runner.sh
         args:
@@ -120,14 +120,20 @@ presubmits:
     - master
     always_run: true
     decorate: true
+    labels:
+      # Python unit tests run in docker.
+      preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211208-9473f90198-test-infra
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-test-infra
         command:
         - runner.sh
         args:
         - make
         - unit
+        # docker-in-docker needs privileged mode
+        securityContext:
+          privileged: true
     annotations:
       testgrid-dashboards: presubmits-test-infra
       testgrid-tab-name: unit-test
@@ -141,7 +147,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211208-9473f90198-test-infra
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-test-infra
         command:
         - runner.sh
         args:
@@ -165,7 +171,7 @@ presubmits:
     decorate: true
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211208-9473f90198-test-infra
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-test-infra
         command:
         - runner.sh
         args:

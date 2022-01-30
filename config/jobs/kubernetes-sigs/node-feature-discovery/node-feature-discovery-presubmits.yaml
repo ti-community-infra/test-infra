@@ -55,13 +55,38 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-master
         securityContext:
           privileged: true
         command:
         - runner.sh
         args:
         - scripts/test-infra/build-image.sh
+  - name: pull-node-feature-discovery-build-image-cross
+    always_run: true
+    skip_branches:
+    - gh-pages
+    - ^release-0.6
+    - ^release-0.7
+    - ^release-0.8
+    - ^release-0.9
+
+    decorate: true
+    annotations:
+      testgrid-dashboards: sig-node-node-feature-discovery
+      testgrid-tab-name: build-image-cross
+      description: "Build multiarch container images of node-feature-discovery"
+    labels:
+      preset-dind-enabled: "true"
+    spec:
+      containers:
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-master
+        securityContext:
+          privileged: true
+        command:
+        - runner.sh
+        args:
+        - scripts/test-infra/build-image-cross.sh
   - name: pull-node-feature-discovery-build-gh-pages
     always_run: true
     skip_branches:
@@ -75,7 +100,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-master
         securityContext:
           privileged: true
         command:

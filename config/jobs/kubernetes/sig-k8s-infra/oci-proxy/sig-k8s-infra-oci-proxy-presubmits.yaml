@@ -1,0 +1,42 @@
+presubmits:
+  kubernetes-sigs/oci-proxy:
+  - name: pull-oci-proxy-verify
+    decorate: true
+    always_run: true
+    spec:
+      containers:
+      - image: golang
+        command:
+        - make
+        - verify
+        # shellcheck has its own job so we don't need docker
+        - VERIFY_SHELLCHECK=false
+  - name: pull-oci-proxy-shellcheck
+    decorate: true
+    always_run: true
+    spec:
+      containers:
+      - image: golang
+        command:
+        - bash
+        - -c
+        - hack/tools/ci-install-shellcheck.sh && make shellcheck
+  - name: pull-oci-proxy-test
+    decorate: true
+    always_run: true
+    spec:
+      containers:
+      - image: golang
+        command:
+        - make
+        - test
+  - name: pull-oci-proxy-build
+    decorate: true
+    always_run: true
+    spec:
+      containers:
+      - image: golang
+        command:
+        - make
+        - images
+        - build

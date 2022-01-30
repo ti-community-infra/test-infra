@@ -19,10 +19,14 @@ package gerrit
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/andygrunwald/go-gerrit"
 	"github.com/sirupsen/logrus"
@@ -31,6 +35,7 @@ import (
 
 	v1 "k8s.io/test-infra/prow/apis/prowjobs/v1"
 	"k8s.io/test-infra/prow/config"
+	"k8s.io/test-infra/prow/crier/reporters/criercommonlib"
 	"k8s.io/test-infra/prow/gerrit/client"
 	"k8s.io/test-infra/prow/kube"
 )
@@ -41,8 +46,10 @@ const (
 	hourglass  = "⏳"
 	prohibited = "🚫"
 
-	defaultProwHeader = "Prow Status:"
-	jobReportFormat   = "%s %s %s - %s\n"
+	defaultProwHeader         = "Prow Status:"
+	jobReportFormat           = "%s %s %s - %s\n"
+	jobReportFormatWithoutURL = "%s %s %s\n"
+	errorLinePrefix           = "NOTE FROM PROW"
 
 	// lgtm means all presubmits passed, but need someone else to approve before merge (looks good to me).
 	lgtm = "+1"
@@ -52,6 +59,11 @@ const (
 	lztm = "0"
 	// codeReview is the default gerrit code review label
 	codeReview = client.CodeReview
+	// maxCommentSizeLimit is from
+	// http://gerrit-documentation.storage.googleapis.com/Documentation/3.2.0/config-gerrit.html#change.commentSizeLimit,
+	// if a comment is 16000 chars it's almost not readable any way, let's not
+	// use all of the space, picking 80% as a heuristic number here
+	maxCommentSizeLimit = 14400
 )
 
 var (
@@ -71,8 +83,9 @@ type gerritClient interface {
 
 // Client is a gerrit reporter client
 type Client struct {
-	gc     gerritClient
-	lister ctrlruntimeclient.Reader
+	gc          gerritClient
+	pjclientset ctrlruntimeclient.Client
+	prLocks     *criercommonlib.ShardedLock
 }
 
 // Job is the view of a prowjob scoped for a report
@@ -93,7 +106,7 @@ type JobReport struct {
 }
 
 // NewReporter returns a reporter client
-func NewReporter(cfg config.Getter, cookiefilePath string, projects map[string][]string, lister ctrlruntimeclient.Reader) (*Client, error) {
+func NewReporter(cfg config.Getter, cookiefilePath string, projects map[string][]string, pjclientset ctrlruntimeclient.Client) (*Client, error) {
 	gc, err := client.NewClient(projects)
 	if err != nil {
 		return nil, err
@@ -110,10 +123,14 @@ func NewReporter(cfg config.Getter, cookiefilePath string, projects map[string][
 	// line arg(which is going to be deprecated).
 	gc.Authenticate(cookiefilePath, "")
 
-	return &Client{
-		gc:     gc,
-		lister: lister,
-	}, nil
+	c := &Client{
+		gc:          gc,
+		pjclientset: pjclientset,
+		prLocks:     criercommonlib.NewShardedLock(),
+	}
+
+	c.prLocks.RunCleanup()
+	return c, nil
 }
 
 func applyGlobalConfig(cfg config.Getter, gerritClient *client.Client, cookiefilePath string) {
@@ -192,7 +209,7 @@ func (c *Client) ShouldReport(ctx context.Context, log *logrus.Entry, pj *v1.Pro
 		}
 
 		var pjs v1.ProwJobList
-		if err := c.lister.List(ctx, &pjs, ctrlruntimeclient.MatchingLabels(selector)); err != nil {
+		if err := c.pjclientset.List(ctx, &pjs, ctrlruntimeclient.MatchingLabels(selector)); err != nil {
 			log.WithError(err).Errorf("Cannot list prowjob with selector %v", selector)
 			return false
 		}
@@ -229,22 +246,71 @@ func (c *Client) ShouldReport(ctx context.Context, log *logrus.Entry, pj *v1.Pro
 	patchsetNum := patchsetNumFromPJ(pj)
 
 	// Check all other prowjobs to see whether they agree or not
-	return allPJsAgreeToReport([]string{client.GerritRevision, kube.ProwJobTypeLabel, client.GerritReportLabel}, func(pj *v1.ProwJob) bool {
-		if pj.Status.State == v1.TriggeredState || pj.Status.State == v1.PendingState {
+	return allPJsAgreeToReport([]string{client.GerritRevision, kube.ProwJobTypeLabel, client.GerritReportLabel}, func(otherPj *v1.ProwJob) bool {
+		if otherPj.Status.State == v1.TriggeredState || otherPj.Status.State == v1.PendingState {
 			// other jobs with same label are still running on this revision, skip report
 			log.Info("Other jobs with same label are still running on this revision")
 			return false
 		}
 		return true
-	}) && allPJsAgreeToReport([]string{kube.OrgLabel, kube.RepoLabel, kube.PullLabel}, func(pj *v1.ProwJob) bool {
+	}) && allPJsAgreeToReport([]string{kube.OrgLabel, kube.RepoLabel, kube.PullLabel}, func(otherPj *v1.ProwJob) bool {
+		// This job has duplicate(s) and there are newer one(s)
+		if otherPj.Spec.Job == pj.Spec.Job && otherPj.CreationTimestamp.After(pj.CreationTimestamp.Time) {
+			return false
+		}
 		// Newer patchset exists, skip report
-		return patchsetNumFromPJ(pj) <= patchsetNum
+		return patchsetNumFromPJ(otherPj) <= patchsetNum
 	})
 }
 
 // Report will send the current prowjob status as a gerrit review
 func (c *Client) Report(ctx context.Context, logger *logrus.Entry, pj *v1.ProwJob) ([]*v1.ProwJob, *reconcile.Result, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	logger = logger.WithFields(logrus.Fields{"job": pj.Spec.Job, "name": pj.Name})
+
+	// Gerrit reporter hasn't learned how to deduplicate itself from report yet,
+	// will need to block here. Unfortunately need to check after this section
+	// to ensure that the job was not already marked reported by other threads
+	// TODO(chaodaiG): postsubmit job technically doesn't know which PR it's
+	// from, currently it's associated with a PR in gerrit in a weird way, which
+	// needs to be fixed in
+	// https://github.com/kubernetes/test-infra/issues/22653, remove the
+	// PostsubmitJob check once it's fixed
+	if pj.Spec.Type == v1.PresubmitJob || pj.Spec.Type == v1.PostsubmitJob {
+		key, err := lockKeyForPJ(pj)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get lockkey for job: %w", err)
+		}
+		lock, err := c.prLocks.GetLock(ctx, *key)
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := lock.Acquire(ctx, 1); err != nil {
+			return nil, nil, err
+		}
+		defer lock.Release(1)
+
+		// In the case where several prow jobs from the same PR are finished one
+		// after another, by the time the lock is acquired, this job might have
+		// already been reported by another worker, refetch this pj to make sure
+		// that no duplicate report is produced
+		pjObjKey := ctrlruntimeclient.ObjectKeyFromObject(pj)
+		if err := c.pjclientset.Get(ctx, pjObjKey, pj); err != nil {
+			if apierrors.IsNotFound(err) {
+				// Job could be GC'ed or deleted for other reasons, not to
+				// report, this is not a prow error and should not be retried
+				logger.Debug("object no longer exist")
+				return nil, nil, nil
+			}
+
+			return nil, nil, fmt.Errorf("failed to get prowjob %s: %w", pjObjKey.String(), err)
+		}
+		if pj.Status.PrevReportStates[c.GetName()] == pj.Status.State {
+			logger.Info("Already reported by other threads.")
+			return nil, nil, nil
+		}
+	}
+
+	newCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	clientGerritRevision := client.GerritRevision
@@ -253,21 +319,20 @@ func (c *Client) Report(ctx context.Context, logger *logrus.Entry, pj *v1.ProwJo
 	pjTypeLabel := kube.ProwJobTypeLabel
 	gerritReportLabel := client.GerritReportLabel
 
+	var pjsOnRevisionWithSameLabel v1.ProwJobList
 	var toReportJobs []*v1.ProwJob
 	if pj.ObjectMeta.Labels[gerritReportLabel] == "" && pj.Status.State != v1.AbortedState {
 		toReportJobs = append(toReportJobs, pj)
 	} else { // generate an aggregated report
 
 		// list all prowjobs in the patchset matching pj's type (pre- or post-submit)
-
 		selector := map[string]string{
 			clientGerritRevision: pj.ObjectMeta.Labels[clientGerritRevision],
 			pjTypeLabel:          pj.ObjectMeta.Labels[pjTypeLabel],
 			gerritReportLabel:    pj.ObjectMeta.Labels[gerritReportLabel],
 		}
 
-		var pjsOnRevisionWithSameLabel v1.ProwJobList
-		if err := c.lister.List(ctx, &pjsOnRevisionWithSameLabel, ctrlruntimeclient.MatchingLabels(selector)); err != nil {
+		if err := c.pjclientset.List(newCtx, &pjsOnRevisionWithSameLabel, ctrlruntimeclient.MatchingLabels(selector)); err != nil {
 			logger.WithError(err).WithField("selector", selector).Errorf("Cannot list prowjob with selector")
 			return nil, nil, err
 		}
@@ -283,7 +348,7 @@ func (c *Client) Report(ctx context.Context, logger *logrus.Entry, pj *v1.ProwJo
 			toReportJobs = append(toReportJobs, pjOnRevisionWithSameLabel)
 		}
 	}
-	report := GenerateReport(toReportJobs)
+	report := GenerateReport(toReportJobs, 0)
 	message := report.Header + report.Message
 	// report back
 	gerritID := pj.ObjectMeta.Annotations[clientGerritID]
@@ -330,7 +395,7 @@ func (c *Client) Report(ctx context.Context, logger *logrus.Entry, pj *v1.ProwJo
 
 	logger.Infof("Reporting to instance %s on id %s with message %s", gerritInstance, gerritID, message)
 	if err := c.gc.SetReview(gerritInstance, gerritID, gerritRevision, message, reviewLabels); err != nil {
-		logger.WithError(err).Infof("fail to set review with label %q on change ID %s", reportLabel, gerritID)
+		logger.WithError(err).WithField("gerrit_id", gerritID).WithField("label", reportLabel).Info("Failed to set review.")
 
 		if reportLabel == "" {
 			return nil, nil, err
@@ -338,13 +403,50 @@ func (c *Client) Report(ctx context.Context, logger *logrus.Entry, pj *v1.ProwJo
 		// Retry without voting on a label
 		message := fmt.Sprintf("[NOTICE]: Prow Bot cannot access %s label!\n%s", reportLabel, message)
 		if err := c.gc.SetReview(gerritInstance, gerritID, gerritRevision, message, nil); err != nil {
-			logger.WithError(err).Errorf("fail to set plain review on change ID %s", gerritID)
+			logger.WithError(err).WithField("gerrit_id", gerritID).Errorf("Failed to set plain review on change ID.")
 			return nil, nil, err
 		}
 	}
 
-	logger.Infof("Review Complete, reported jobs: %v", toReportJobs)
-	return toReportJobs, nil, nil
+	logger.Infof("Review Complete, reported jobs: %s", jobNames(toReportJobs))
+
+	// If return here, the shardedLock will be released, and other threads that
+	// are from the same PR will still not understand that it's already
+	// reported, as the change of previous report state happens only after the
+	// returning of current function from the caller.
+	// Ideally the previous report state should be changed here.
+	// This operation takes a long time when there are a lot of jobs
+	// in the batch, so we are creating a new context.
+	loopCtx, loopCancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer loopCancel()
+	logger.WithFields(logrus.Fields{
+		"job-count":      len(toReportJobs),
+		"all-jobs-count": len(pjsOnRevisionWithSameLabel.Items),
+	}).Info("Reported job(s), now will update pj(s).")
+	var err error
+	// All latest jobs for this label were already reported, none of the jobs
+	// for this label are worthy reporting any more. Mark all of them as
+	// reported to avoid corner cases where an older job finished later, and the
+	// newer prowjobs CRD was somehow missing from the cluster.
+	for _, pjob := range pjsOnRevisionWithSameLabel.Items {
+		if pjob.Status.State == v1.AbortedState || pjob.Status.PrevReportStates[c.GetName()] == pjob.Status.State {
+			continue
+		}
+		if err = criercommonlib.UpdateReportStateWithRetries(loopCtx, &pjob, logger, c.pjclientset, c.GetName()); err != nil {
+			logger.WithError(err).Error("Failed to update report state on prowjob")
+		}
+	}
+
+	// Let caller know that we are done with this job.
+	return nil, nil, err
+}
+
+func jobNames(jobs []*v1.ProwJob) []string {
+	names := make([]string, len(jobs))
+	for i, job := range jobs {
+		names[i] = fmt.Sprintf("%s, %s", job.Spec.Job, job.Name)
+	}
+	return names
 }
 
 func statusIcon(state v1.ProwJobState) string {
@@ -355,12 +457,36 @@ func statusIcon(state v1.ProwJobState) string {
 	return icon
 }
 
+// jobFromPJ extracts the minimum job information for the given ProwJob, to be
+// used by GenerateReport to create a textual report of it. It will be
+// serialized to a single line of text, with or without the URL depending on how
+// much room we have left against maxCommentSizeLimit. The reason why it is
+// serialized as a single line of text is because ParseReport uses newlines as a
+// token delimiter.
 func jobFromPJ(pj *v1.ProwJob) Job {
 	return Job{Name: pj.Spec.Job, State: pj.Status.State, Icon: statusIcon(pj.Status.State), URL: pj.Status.URL}
 }
 
+func (j *Job) serializeWithoutURL() string {
+	return fmt.Sprintf(jobReportFormatWithoutURL, j.Icon, j.Name, strings.ToUpper(string(j.State)))
+}
+
 func (j *Job) serialize() string {
 	return fmt.Sprintf(jobReportFormat, j.Icon, j.Name, strings.ToUpper(string(j.State)), j.URL)
+}
+
+func deserializeWithoutURL(s string, j *Job) error {
+	var state string
+	n, err := fmt.Sscanf(s, jobReportFormatWithoutURL, &j.Icon, &j.Name, &state)
+	if err != nil {
+		return err
+	}
+	j.State = v1.ProwJobState(strings.ToLower(state))
+	const want = 3
+	if n != want {
+		return fmt.Errorf("scan: got %d, want %d", n, want)
+	}
+	return nil
 }
 
 func deserialize(s string, j *Job) error {
@@ -377,7 +503,35 @@ func deserialize(s string, j *Job) error {
 	return nil
 }
 
-func GenerateReport(pjs []*v1.ProwJob) JobReport {
+func errorMessageLine(s string) string {
+	return fmt.Sprintf("[%s: %s]", errorLinePrefix, s)
+}
+
+func isErrorMessageLine(s string) bool {
+	return strings.HasPrefix(s, fmt.Sprintf("[%s: ", errorLinePrefix))
+}
+
+// GenerateReport generates a JobReport based on pjs passed in. As URLs are very
+// long string, including them in the report could easily make the report exceed
+// the maxCommentSizeLimit of 14400 characters.  Unfortunately we need info for
+// all prowjobs for /retest to work, which is by far the most reliable way of
+// retrieving prow jobs results (this is because prowjob custom resources are
+// garbage-collected by sinker after max_pod_age, which normally is 48 hours).
+// So to ensure that all prow jobs results are displayed, URLs for some of the
+// jobs are omitted from this report to keep it under 14400 characters.
+//
+// customCommentSizeLimit is used by unit tests that actually test that we
+// perform job serialization with or without URLs (without this, our unit tests
+// would have to be very large to hit the default maxCommentSizeLimit to trigger
+// the "don't print URLs" behavior).
+func GenerateReport(pjs []*v1.ProwJob, customCommentSizeLimit int) JobReport {
+	// By default, use the maximum comment size limit const.
+	commentSizeLimit := maxCommentSizeLimit
+	if customCommentSizeLimit > 0 {
+		commentSizeLimit = customCommentSizeLimit
+	}
+
+	// Construct JobReport.
 	report := JobReport{Total: len(pjs)}
 	for _, pj := range pjs {
 		job := jobFromPJ(pj)
@@ -385,17 +539,97 @@ func GenerateReport(pjs []*v1.ProwJob) JobReport {
 		if pj.Status.State == v1.SuccessState {
 			report.Success++
 		}
-
-		report.Message += job.serialize()
-		report.Message += "\n"
-
 	}
-	report.Header = defaultProwHeader
+
+	fullHeader := func(header, reTestMessage string) string {
+		return fmt.Sprintf("%s%s\n", header, reTestMessage)
+	}
+
+	report.Header = fmt.Sprintf("%s %d out of %d pjs passed!", defaultProwHeader, report.Success, report.Total)
 	var reTestMessage string
 	if report.Success < report.Total {
 		reTestMessage = " Comment '/retest' to rerun all failed tests"
 	}
-	report.Header += fmt.Sprintf(" %d out of %d pjs passed!%s\n", report.Success, report.Total, reTestMessage)
+
+	// Sort first so that failed jobs are always on top. This also makes it so
+	// that the failed jobs get priority in terms of getting linked to the job
+	// URL.
+	sort.Slice(report.Jobs, func(i, j int) bool {
+		for _, state := range []v1.ProwJobState{
+			v1.FailureState,
+			v1.ErrorState,
+			v1.AbortedState,
+		} {
+			if report.Jobs[i].State == state {
+				return true
+			}
+			if report.Jobs[j].State == state {
+				return false
+			}
+		}
+		// We don't care about other states, so keep original order.
+		return true
+	})
+
+	// TODO(listx): Clean this up (whether we include or exclude URLs). We
+	// should probably just construct an optimistic report (with full URLs), and
+	// then decide to trim it down if we are over the commentSizeLimit.
+	//
+	// Another thing we can do is do text-to-text compression so that we
+	// (almost) never skip reporting. E.g., see
+	// https://stackoverflow.com/a/41188719/437583. This should suffice for most
+	// scenarios because most of the time the job URLs share a large prefix
+	// (ideal for compression).
+	//
+	// Additionally, note that newline characters are very special here because
+	// they are used as token delimiters during deserialization (see
+	// https://github.com/kubernetes/test-infra/blob/b45b20a405a82de65d56196da00f6106b841dd40/prow/gerrit/adapter/adapter.go#L260).
+	// The use of newline characters is most likely a result of Gerrit comments
+	// only supporting plaintext (and thus, needing to use a delimiter that is
+	// not awkward on human eyes).
+	remainingSize := commentSizeLimit - len(fullHeader(report.Header, reTestMessage))
+	linesWithURLs := make([]string, len(report.Jobs))
+	linesWithoutURLs := make([]string, len(report.Jobs))
+	for i, job := range report.Jobs {
+		linesWithURLs[i] = job.serialize()
+		remainingSize -= len(linesWithURLs[i])
+	}
+
+	// cutoff is the index where if it's the line contains URL it will exceed the
+	// size limit.
+	cutoff := len(report.Jobs)
+	for cutoff > 0 && remainingSize < 0 {
+		cutoff--
+		linesWithoutURLs[cutoff] = report.Jobs[cutoff].serializeWithoutURL()
+		// remainingSize >= 0 after this condition means next line is not good
+		// to include URL
+		remainingSize += len(linesWithURLs[cutoff]) - len(linesWithoutURLs[cutoff])
+	}
+
+	// This shouldn't happen unless there are too many prow jobs(e.g. > 300) and
+	// each job name is super long(e.g. > 50)
+	if remainingSize < 0 {
+		report.Header = fullHeader(report.Header, " Comment '/test all' to rerun all tests")
+		report.Message = errorMessageLine("Prow failed to report all jobs, are there excessive amount of prow jobs?")
+		return report
+	}
+
+	// Now that we know a cutoff between long and short lines, assemble them
+	for i := range report.Jobs {
+		if i < cutoff {
+			report.Message += linesWithURLs[i]
+		} else {
+			report.Message += linesWithoutURLs[i]
+		}
+	}
+
+	if cutoff < len(report.Jobs) {
+		// Note that this makes the comment longer, but since the size limit of
+		// 14400 is conservative, we should be fine
+		report.Message += errorMessageLine(fmt.Sprintf("Skipped displaying URLs for %d/%d jobs due to reaching gerrit comment size limit", len(report.Jobs)-cutoff, len(report.Jobs)))
+	}
+
+	report.Header = fullHeader(report.Header, reTestMessage)
 	return report
 }
 
@@ -417,13 +651,16 @@ func ParseReport(message string) *JobReport {
 	var report JobReport
 	report.Header = contents[start] + "\n"
 	for i := start + 1; i < len(contents); i++ {
-		if contents[i] == "" {
+		if contents[i] == "" || isErrorMessageLine(contents[i]) {
 			continue
 		}
 		var j Job
 		if err := deserialize(contents[i], &j); err != nil {
-			logrus.Warnf("Could not deserialize %s to a job: %v", contents[i], err)
-			continue
+			// Will also need to support reports without URL
+			if err = deserializeWithoutURL(contents[i], &j); err != nil {
+				logrus.Warnf("Could not deserialize %s to a job: %v", contents[i], err)
+				continue
+			}
 		}
 		report.Total++
 		if j.State == v1.SuccessState {
@@ -438,4 +675,19 @@ func ParseReport(message string) *JobReport {
 // String implements Stringer for JobReport
 func (r JobReport) String() string {
 	return fmt.Sprintf("%s\n%s", r.Header, r.Message)
+}
+
+func lockKeyForPJ(pj *v1.ProwJob) (*criercommonlib.SimplePull, error) {
+	// TODO(chaodaiG): remove postsubmit once
+	// https://github.com/kubernetes/test-infra/issues/22653 is fixed
+	if pj.Spec.Type != v1.PresubmitJob && pj.Spec.Type != v1.PostsubmitJob {
+		return nil, fmt.Errorf("can only get lock key for presubmit and postsubmit jobs, was %q", pj.Spec.Type)
+	}
+	if pj.Spec.Refs == nil {
+		return nil, errors.New("pj.Spec.Refs is nil")
+	}
+	if n := len(pj.Spec.Refs.Pulls); n != 1 {
+		return nil, fmt.Errorf("prowjob doesn't have one but %d pulls", n)
+	}
+	return criercommonlib.NewSimplePull(pj.Spec.Refs.Org, pj.Spec.Refs.Repo, pj.Spec.Refs.Pulls[0].Number), nil
 }

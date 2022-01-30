@@ -31,7 +31,7 @@ EOF
 }
 
 # we need to define the full image URL so it can be autobumped
-tmp="gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master"
+tmp="gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-master"
 kubekins_e2e_image="${tmp/\-master/}"
 
 readonly ginkgo_focus="\[Conformance\]|\[NodeConformance\]|\[sig-windows\]|\[sig-apps\].CronJob|\[sig-api-machinery\].ResourceQuota|\[sig-network\].EndpointSlice"
@@ -41,13 +41,20 @@ for release in "$@"; do
   output="${dir}/release-${release}-windows-presubmits.yaml"
   orchestrator_release="${release}"
   branch="release-${release}"
+  branch_name="release-${release}"
   dockershim_api_model="https://raw.githubusercontent.com/kubernetes-sigs/windows-testing/master/job-templates/kubernetes_release_staging.json"
   containerd_api_model="https://raw.githubusercontent.com/kubernetes-sigs/windows-testing/master/job-templates/kubernetes_containerd_master.json"
+  repolist_label="preset-windows-repo-list-master: \"true\""
+  preset_label=$(echo -e "\n      preset-windows-private-registry-cred: \"true\"")
+  dockerconfigfile="--docker-config-file=\$(DOCKER_CONFIG_FILE) "
 
   case ${release} in
     1.20)
       dockershim_api_model="https://raw.githubusercontent.com/kubernetes-sigs/windows-testing/master/job-templates/kubernetes_release_1_20.json"
       containerd_api_model="https://raw.githubusercontent.com/kubernetes-sigs/windows-testing/master/job-templates/kubernetes_containerd_1_20.json"
+      repolist_label="preset-windows-repo-list: \"true\""
+      dockerconfigfile=""
+      preset_label=""
       ;;
     1.21)
       dockershim_api_model="https://raw.githubusercontent.com/kubernetes-sigs/windows-testing/master/job-templates/kubernetes_release_1_21.json"
@@ -60,7 +67,8 @@ for release in "$@"; do
       containerd_api_model="https://raw.githubusercontent.com/kubernetes-sigs/windows-testing/master/job-templates/kubernetes_containerd_1_23.json"
       ;;
     *)
-      branch="master"
+      branch=$(echo -e 'master # TODO(releng): Remove once repo default branch has been renamed\n    - main')
+      branch_name=master
       orchestrator_release="1.23"
       ;;
   esac
@@ -82,10 +90,9 @@ presubmits:
       preset-service-account: "true"
       preset-azure-cred: "true"
       preset-azure-windows: "true"
-      preset-windows-repo-list-master: "true"
+      ${repolist_label}
       preset-k8s-ssh: "true"
-      preset-dind-enabled: "true"
-      preset-windows-private-registry-cred: "true"
+      preset-dind-enabled: "true"${preset_label}
     spec:
       containers:
       - image: ${kubekins_e2e_image}-${release}
@@ -115,11 +122,11 @@ presubmits:
         - --aksengine-deploy-custom-k8s
         - --aksengine-agentpoolcount=2
         # Specific test args
-        - --test_args=--node-os-distro=windows --docker-config-file=\$(DOCKER_CONFIG_FILE) --ginkgo.focus=${ginkgo_focus} --ginkgo.skip=${ginkgo_skip}
+        - --test_args=--node-os-distro=windows ${dockerconfigfile}--ginkgo.focus=${ginkgo_focus} --ginkgo.skip=${ginkgo_skip}
         - --ginkgo-parallel=4
         securityContext:
           privileged: true
-$(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-aks-engine-windows-dockershim-${release})
+$(generate_presubmit_annotations ${branch_name} pull-kubernetes-e2e-aks-engine-windows-dockershim-${release})
   - name: pull-kubernetes-e2e-aks-engine-windows-containerd-${release//./-}
     always_run: false
     optional: true
@@ -134,10 +141,9 @@ $(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-aks-engine-window
       preset-service-account: "true"
       preset-azure-cred: "true"
       preset-azure-windows: "true"
-      preset-windows-repo-list-master: "true"
+      ${repolist_label}
       preset-k8s-ssh: "true"
-      preset-dind-enabled: "true"
-      preset-windows-private-registry-cred: "true"
+      preset-dind-enabled: "true"${preset_label}
     spec:
       containers:
       - image: ${kubekins_e2e_image}-${release}
@@ -167,11 +173,11 @@ $(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-aks-engine-window
         - --aksengine-deploy-custom-k8s
         - --aksengine-agentpoolcount=2
         # Specific test args
-        - --test_args=--node-os-distro=windows --docker-config-file=\$(DOCKER_CONFIG_FILE) --ginkgo.focus=${ginkgo_focus} --ginkgo.skip=${ginkgo_skip}
+        - --test_args=--node-os-distro=windows ${dockerconfigfile}--ginkgo.focus=${ginkgo_focus} --ginkgo.skip=${ginkgo_skip}
         - --ginkgo-parallel=4
         securityContext:
           privileged: true
-$(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-aks-engine-windows-containerd-${release})
+$(generate_presubmit_annotations ${branch_name} pull-kubernetes-e2e-aks-engine-windows-containerd-${release})
   - name: pull-kubernetes-e2e-aks-engine-azure-disk-windows-dockershim-${release//./-}
     decorate: true
     decoration_config:
@@ -191,7 +197,7 @@ $(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-aks-engine-window
     extra_refs:
     - org: kubernetes-sigs
       repo: azuredisk-csi-driver
-      base_ref: master
+      base_ref: release-1.9
       path_alias: sigs.k8s.io/azuredisk-csi-driver
     spec:
       containers:
@@ -230,7 +236,7 @@ $(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-aks-engine-window
           value: kubernetes.io/azure-disk # In-tree Azure disk storage class
         - name: TEST_WINDOWS
           value: "true"
-$(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-aks-engine-azure-disk-windows-dockershim-${release})
+$(generate_presubmit_annotations ${branch_name} pull-kubernetes-e2e-aks-engine-azure-disk-windows-dockershim-${release})
   - name: pull-kubernetes-e2e-aks-engine-azure-file-windows-dockershim-${release//./-}
     decorate: true
     decoration_config:
@@ -254,7 +260,7 @@ $(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-aks-engine-azure-
       path_alias: sigs.k8s.io/azurefile-csi-driver
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-master
         command:
         - runner.sh
         - kubetest
@@ -289,6 +295,6 @@ $(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-aks-engine-azure-
           value: kubernetes.io/azure-file # In-tree Azure file storage class
         - name: TEST_WINDOWS
           value: "true"
-$(generate_presubmit_annotations ${branch} pull-kubernetes-e2e-aks-engine-azure-file-windows-dockershim-${release})
+$(generate_presubmit_annotations ${branch_name} pull-kubernetes-e2e-aks-engine-azure-file-windows-dockershim-${release})
 EOF
 done

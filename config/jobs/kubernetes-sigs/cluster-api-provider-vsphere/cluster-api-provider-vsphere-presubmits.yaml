@@ -5,17 +5,17 @@ presets:
   - name: GOVC_URL
     valueFrom:
       secretKeyRef:
-        name: clusterapi-provider-vsphere-ci-prow
+        name: capv-ci-overrides
         key: vsphere-server
   - name: GOVC_USERNAME
     valueFrom:
       secretKeyRef:
-        name: clusterapi-provider-vsphere-ci-prow
+        name: capv-ci-overrides
         key: vsphere-username
   - name: GOVC_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: clusterapi-provider-vsphere-ci-prow
+        name: capv-ci-overrides
         key: vsphere-password
   - name: VM_SSH_PUB_KEY
     valueFrom:
@@ -86,7 +86,7 @@ presubmits:
     path_alias: sigs.k8s.io/cluster-api-provider-vsphere
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-1.21
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-1.21
         command:
         - hack/check-lint.sh
     annotations:
@@ -141,7 +141,7 @@ presubmits:
     path_alias: sigs.k8s.io/cluster-api-provider-vsphere
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-1.21
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-1.21
         command:
         - hack/verify-crds.sh
     annotations:
@@ -157,7 +157,7 @@ presubmits:
     path_alias: sigs.k8s.io/cluster-api-provider-vsphere
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-1.21
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-1.21
         resources:
           requests:
             cpu: "500m"
@@ -180,9 +180,11 @@ presubmits:
     run_if_changed: '^((api|cmd|config|contrib|controllers|pkg|test)/|Makefile)'
     decorate: true
     path_alias: sigs.k8s.io/cluster-api-provider-vsphere
+    branches:
+    - ^master$
     spec:
       containers:
-        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-1.21
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-1.21
           # we need privileged mode in order to do docker in docker
           securityContext:
             privileged: true
@@ -216,7 +218,7 @@ presubmits:
     max_concurrency: 3
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20211217-ea95cec1d4-1.21
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20220124-681f3531ec-1.21
         command:
         - runner.sh
         args:
