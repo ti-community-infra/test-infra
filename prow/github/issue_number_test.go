@@ -15,6 +15,16 @@ func TestNormalizeIssueNumbers(t *testing.T) {
 		expectNumbers []IssueNumberData
 	}{
 		{
+			name:     "issue number with non associate prefix",
+			content:  "Part of #123",
+			currOrg:  "pingcap",
+			currRepo: "tidb",
+
+			expectNumbers: []IssueNumberData{
+				{AssociatePrefix: "ref", Org: "pingcap", Repo: "tidb", Number: 123},
+			},
+		},
+		{
 			name:     "issue number with short prefix",
 			content:  "Issue Number: close #123",
 			currOrg:  "pingcap",
