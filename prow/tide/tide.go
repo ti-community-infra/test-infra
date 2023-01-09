@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -668,13 +667,13 @@ func filterSubpool(provider provider, mergeAllowed func(*CodeReviewCommon) (stri
 
 // filterPR indicates if a PR should be filtered out of the subpool.
 // Specifically we filter out PRs that:
-// - Have known merge conflicts or invalid merge method.
-// - Have failing or missing status contexts.
-// - Have pending required status contexts that are not associated with a
-//   ProwJob. (This ensures that the 'tide' context indicates that the pending
-//   status is preventing merge. Required ProwJob statuses are allowed to be
-//   'pending' because this prevents kicking PRs from the pool when Tide is
-//   retesting them.)
+//   - Have known merge conflicts or invalid merge method.
+//   - Have failing or missing status contexts.
+//   - Have pending required status contexts that are not associated with a
+//     ProwJob. (This ensures that the 'tide' context indicates that the pending
+//     status is preventing merge. Required ProwJob statuses are allowed to be
+//     'pending' because this prevents kicking PRs from the pool when Tide is
+//     retesting them.)
 //
 // This function works for any source code provider.
 func filterPR(provider provider, mergeAllowed func(*CodeReviewCommon) (string, error), sp *subpool, pr *CodeReviewCommon) bool {
@@ -1854,32 +1853,6 @@ type PullRequest struct {
 	UpdatedAt githubql.DateTime
 }
 
-// Regexp used to compile regular expressions and use it in CommitTemplate.
-func (pr PullRequest) Regexp(pattern string) *regexp.Regexp {
-	return regexp.MustCompile(pattern)
-}
-
-// ExtractContent used to extract text content through regular expressions.
-// Engage that when the regexp contains a named group named `content`, only the part matched by the named group
-// will be returned, if not, the part matched by the entire regular expression will be returned.
-func (pr PullRequest) ExtractContent(pattern string, content string) string {
-	compile, err := regexp.Compile(pattern)
-	if err != nil {
-		panic(fmt.Errorf("failed to compile the extract content regexp: %v", err))
-	}
-
-	index := compile.SubexpIndex("content")
-	if index == -1 {
-		return compile.FindString(content)
-	} else {
-		if compile.MatchString(content) {
-			matches := compile.FindStringSubmatch(content)
-			return strings.TrimSpace(matches[index])
-		}
-		return ""
-	}
-}
-
 // NormalizeIssueNumbers is an utils method in CommitTemplate that used to extract the issue numbers in the text
 // and normalize it by a uniform format.
 func (pr PullRequest) NormalizeIssueNumbers(content string) []github.IssueNumberData {
@@ -2128,7 +2101,6 @@ func nonFailedBatchByNameBaseAndPullsIndexFunc(obj ctrlruntimeclient.Object) []s
 	return []string{nonFailedBatchByNameBaseAndPullsIndexKey(pj.Spec.Job, pj.Spec.Refs)}
 }
 
-//
 func checkRunNodesToContexts(log *logrus.Entry, nodes []CheckRunNode) []Context {
 	var result []Context
 	for _, node := range nodes {
