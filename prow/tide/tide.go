@@ -1845,7 +1845,7 @@ type PullRequest struct {
 	// additional API token. (see the 'headContexts' func for details)
 	// We can't raise this too much or we could hit the limit of 50,000 nodes
 	// per query: https://developer.github.com/v4/guides/resource-limitations/#node-limit
-	Commits   Commits `graphql:"commits(last: 4)"`
+	Commits   Commits `graphql:"commits(last: 100)"`
 	Labels    Labels  `graphql:"labels(first: 100)"`
 	Milestone *Milestone
 	Body      githubql.String
