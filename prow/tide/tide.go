@@ -58,7 +58,6 @@ type githubClient interface {
 	GetCombinedStatus(org, repo, ref string) (*github.CombinedStatus, error)
 	ListCheckRuns(org, repo, ref string) (*github.CheckRunList, error)
 	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
-	ListPRCommits(org, repo string, number int) ([]github.RepositoryCommit, error)
 	GetRef(string, string, string) (string, error)
 	GetRepo(owner, name string) (github.FullRepo, error)
 	Merge(string, string, int, github.MergeDetails) error
