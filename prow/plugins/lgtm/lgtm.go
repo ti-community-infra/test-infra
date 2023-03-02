@@ -20,6 +20,7 @@ package lgtm
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -338,16 +339,82 @@ func handle(wantLGTM bool, config *plugins.Configuration, ownersClient repoowner
 		log.Info("Removing LGTM label.")
 		return removeLGTMAndRequestReview(gc, opts, cp, org, repoName, number, getLogins(assignees))
 	} else if !hasLGTM && wantLGTM {
-		log.Info("Adding LGTM label.")
-		return increaseLGTM(gc, opts, cp, log, org, repoName, number, issueAuthor)
+		return increaseLGTM(gc, opts, cp, log, org, repoName, number, issueAuthor, labels)
 	}
 
 	return nil
 }
 
-func increaseLGTM(gc githubClient, opts *plugins.Lgtm, cp commentPruner, log *logrus.Entry, org, repo string, number int, issueAuthor string) error {
+func parseNeedsMoreLgtmCount(opts *plugins.Lgtm, labels []github.Label) (int64, error) {
+	var needMoreLGTMCount int64 = 1
+	if opts.ReviewerCount != nil {
+		needMoreLGTMCount = int64(*opts.ReviewerCount)
+	}
+
+	for _, l := range labels {
+		// execlude not matched labels.
+		matches := LGTMNeedMoreLabelRe.FindStringSubmatch(l.Name)
+		if len(matches) != 2 {
+			continue
+		}
+
+		val, err := strconv.ParseInt(matches[1], 10, 32)
+		if err != nil {
+			return 0, err
+		}
+
+		// update with minimal value because we add the new label then delete the old label.
+		if val >= needMoreLGTMCount {
+			continue
+		}
+		needMoreLGTMCount = val
+	}
+
+	return needMoreLGTMCount, nil
+}
+
+func lgtmLabelNames(labels []github.Label) []string {
+	var labelNames []string
+
+	for _, l := range labels {
+		if LGTMNeedMoreLabelRe.MatchString(l.Name) {
+			labelNames = append(labelNames, l.Name)
+		}
+
+	}
+	return labelNames
+}
+
+func increaseLGTM(gc githubClient, opts *plugins.Lgtm, cp commentPruner, log *logrus.Entry, org, repo string, number int, issueAuthor string, labels []github.Label) error {
+	needMoreLGTMCount, err := parseNeedsMoreLgtmCount(opts, labels)
+	if err != nil {
+		return err
+	}
+
+	toRemoveLabels := lgtmLabelNames((labels))
+
+	if needMoreLGTMCount > 1 {
+		newNeedsMoreLabel := fmt.Sprintf("needs-%d-more-lgtm", needMoreLGTMCount-1)
+		if err := gc.AddLabel(org, repo, number, newNeedsMoreLabel); err != nil {
+			return err
+		}
+		for _, toRemoveLabel := range toRemoveLabels {
+			if err := gc.RemoveLabel(org, repo, number, toRemoveLabel); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// lgtm approved count >= required count.
+	log.Info("Adding LGTM label.")
 	if err := gc.AddLabel(org, repo, number, LGTMLabel); err != nil {
 		return err
+	}
+	for _, toRemoveLabel := range toRemoveLabels {
+		if err := gc.RemoveLabel(org, repo, number, toRemoveLabel); err != nil {
+			return err
+		}
 	}
 
 	if !stickyLgtm(log, gc, opts, issueAuthor, org) {
