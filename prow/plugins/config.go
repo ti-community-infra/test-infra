@@ -362,7 +362,7 @@ type Lgtm struct {
 	StickyLgtmTeam string `json:"trusted_team_for_sticky_lgtm,omitempty"`
 	// ReviewerCount is the minimum number of approved reviewers.
 	// Defaults 1 reviewers.
-	ReviewerCount *int `json:"request_count,omitempty"`
+	ReviewerCount *int `json:"reviewer_count,omitempty"`
 }
 
 // Jira holds the config for the jira plugin.
