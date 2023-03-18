@@ -191,7 +191,7 @@ func handleGenericComment(gc githubClient, config *plugins.Configuration, owners
 	}
 
 	// Only consider open PRs and new comments.
-	if !e.IsPR || e.IssueState != "open" || e.Action != github.GenericCommentActionCreated {
+	if !e.IsPR || e.IssueState != github.PullRequestStateOpen {
 		return nil
 	}
 
@@ -199,8 +199,18 @@ func handleGenericComment(gc githubClient, config *plugins.Configuration, owners
 	// If we create a "/lgtm cancel" comment, remove lgtm if necessary.
 	wantLGTM := false
 	if LGTMRe.MatchString(rc.body) {
+		if e.Action != github.GenericCommentActionCreated {
+			resp := plugins.FormatResponseRaw(rc.body, rc.htmlURL, rc.author,
+				"Please do not delete or edit you lgtm type comment!")
+			return gc.CreateComment(rc.repo.Owner.Name, rc.repo.Name, rc.number, resp)
+		}
 		wantLGTM = true
 	} else if LGTMCancelRe.MatchString(rc.body) {
+		if e.Action != github.GenericCommentActionCreated {
+			resp := plugins.FormatResponseRaw(rc.body, rc.htmlURL, rc.author,
+				"Please do not delete or edit you lgtm type comment!")
+			return gc.CreateComment(rc.repo.Owner.Name, rc.repo.Name, rc.number, resp)
+		}
 		wantLGTM = false
 	} else {
 		return nil
@@ -339,6 +349,14 @@ func handle(wantLGTM bool, config *plugins.Configuration, ownersClient repoowner
 		log.Info("Removing LGTM label.")
 		return removeLGTMAndRequestReview(gc, opts, cp, org, repoName, number, getLogins(assignees))
 	} else if !hasLGTM && wantLGTM {
+		dup, err := hasDumpLGTMs(gc, org, repoName, number, issueAuthor)
+		if err != nil || dup {
+			return err
+		}
+
+		if err := updateTimelineComment(gc, org, repoName, number, issueAuthor, wantLGTM); err != nil {
+			log.Errorf("Updated timeline comment failed: %v", err)
+		}
 		return increaseLGTM(gc, opts, cp, log, org, repoName, number, issueAuthor, labels)
 	}
 
@@ -373,7 +391,7 @@ func parseNeedsMoreLgtmCount(opts *plugins.Lgtm, labels []github.Label) (int64, 
 	return needMoreLGTMCount, nil
 }
 
-func lgtmLabelNames(labels []github.Label) []string {
+func lgtmNeedMoreLabelNames(labels []github.Label) []string {
 	var labelNames []string
 
 	for _, l := range labels {
@@ -391,33 +409,25 @@ func increaseLGTM(gc githubClient, opts *plugins.Lgtm, cp commentPruner, log *lo
 		return err
 	}
 
-	toRemoveLabels := lgtmLabelNames((labels))
-
+	toAddLabel := LGTMLabel
+	// lgtm approved count >= required count.
 	if needMoreLGTMCount > 1 {
-		newNeedsMoreLabel := fmt.Sprintf("needs-%d-more-lgtm", needMoreLGTMCount-1)
-		if err := gc.AddLabel(org, repo, number, newNeedsMoreLabel); err != nil {
-			return err
-		}
-		for _, toRemoveLabel := range toRemoveLabels {
-			if err := gc.RemoveLabel(org, repo, number, toRemoveLabel); err != nil {
-				return err
-			}
-		}
-		return nil
+		toAddLabel = fmt.Sprintf("needs-%d-more-lgtm", needMoreLGTMCount-1)
 	}
 
-	// lgtm approved count >= required count.
-	log.Info("Adding LGTM label.")
-	if err := gc.AddLabel(org, repo, number, LGTMLabel); err != nil {
+	log.Infof("Adding label: `%s` .", toAddLabel)
+	if err := gc.AddLabel(org, repo, number, toAddLabel); err != nil {
 		return err
 	}
-	for _, toRemoveLabel := range toRemoveLabels {
+
+	for _, toRemoveLabel := range lgtmNeedMoreLabelNames((labels)) {
+		log.Infof("Removing label: `%s` .", toRemoveLabel)
 		if err := gc.RemoveLabel(org, repo, number, toRemoveLabel); err != nil {
 			return err
 		}
 	}
 
-	if !stickyLgtm(log, gc, opts, issueAuthor, org) {
+	if toAddLabel == LGTMLabel && !stickyLgtm(log, gc, opts, issueAuthor, org) {
 		if opts.StoreTreeHash {
 			pr, err := gc.GetPullRequest(org, repo, number)
 			if err != nil {

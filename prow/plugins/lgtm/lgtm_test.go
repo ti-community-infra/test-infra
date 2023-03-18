@@ -488,9 +488,9 @@ func TestLGTMComment(t *testing.T) {
 			} else if isLGTMLabelAdded(fc.IssueLabelsAdded, "org", "repo", 5, tc.hasLGTM) {
 				t.Error("should not have added LGTM.")
 			}
-			if tc.shouldComment && len(fc.IssueComments[5]) != 1 {
+			if tc.shouldComment && len(execludeTimelineType(fc.IssueComments[5])) != 1 {
 				t.Error("should have commented.")
-			} else if !tc.shouldComment && len(fc.IssueComments[5]) != 0 {
+			} else if !tc.shouldComment && len(execludeTimelineType(fc.IssueComments[5])) != 0 {
 				t.Error("should not have commented.")
 			}
 			if tc.shouldRequest && len(fc.ReviewersRequested) == 0 {
@@ -852,9 +852,9 @@ func TestLGTMFromApproveReview(t *testing.T) {
 		} else if isLGTMLabelAdded(fc.IssueLabelsAdded, "org", "repo", 5, tc.hasLGTM) {
 			t.Errorf("For case %s, should not have added LGTM.", tc.name)
 		}
-		if tc.shouldComment && len(fc.IssueComments[5]) != 1 {
+		if tc.shouldComment && len(execludeTimelineType(fc.IssueComments[5])) != 1 {
 			t.Errorf("For case %s, should have commented.", tc.name)
-		} else if !tc.shouldComment && len(fc.IssueComments[5]) != 0 {
+		} else if !tc.shouldComment && len(execludeTimelineType(fc.IssueComments[5])) != 0 {
 			t.Errorf("For case %s, should not have commented.", tc.name)
 		}
 	}
@@ -1452,4 +1452,16 @@ func isLGTMLabelAdded(issueLabelsAdded []string, owner, repo string, number int,
 		return len(issueLabelsAdded) > 1 && slices.Contains(issueLabelsAdded, lgtmLabel)
 	}
 	return len(issueLabelsAdded) > 0 && slices.Contains(issueLabelsAdded, lgtmLabel)
+}
+
+func execludeTimelineType(comments []github.IssueComment) []github.IssueComment {
+	var ret []github.IssueComment
+
+	for _, c := range comments {
+		if !strings.Contains(c.Body, lgtmTimelineNotificationHeader) {
+			ret = append(ret, c)
+		}
+	}
+
+	return ret
 }
