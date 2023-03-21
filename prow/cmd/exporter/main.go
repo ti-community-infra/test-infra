@@ -71,6 +71,7 @@ func mustRegister(component string, lister lister) *prometheus.Registry {
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 		collectors.NewGoCollector(),
 	)
+
 	return registry
 }
 
