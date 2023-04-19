@@ -58,7 +58,7 @@ type openaiConfig struct {
 	OrgID      string `yaml:"org_id,omitempty" json:"org_id,omitempty"`
 	APIType    string `yaml:"api_type,omitempty" json:"api_type,omitempty"`       // OPEN_AI | AZURE | AZURE_AD
 	APIVersion string `yaml:"api_version,omitempty" json:"api_version,omitempty"` // 2023-03-15-preview, required when APIType is APITypeAzure or APITypeAzureAD
-	Engine     string `yaml:"engine,omitempty" json:"engine,omitempty"`           // required when APIType is APITypeAzure or APITypeAzureAD
+	Engine     string `yaml:"engine,omitempty" json:"engine,omitempty"`           // required when APIType is APITypeAzure or APITypeAzureAD, it's the deploy instance name.
 }
 
 func (o *options) Validate() error {
@@ -74,11 +74,11 @@ func (o *options) Validate() error {
 func gatherOptions() options {
 	o := options{}
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	fs.IntVar(&o.port, "port", 8080, "Port to listen on.")
+	fs.IntVar(&o.port, "port", 8888, "Port to listen on.")
 	fs.BoolVar(&o.dryRun, "dry-run", true, "Dry run for testing. Uses API tokens but does not mutate.")
 	fs.StringVar(&o.webhookSecretFile, "hmac-secret-file", "/etc/webhook/hmac", "Path to the file containing the GitHub HMAC secret.")
 	fs.StringVar(&o.openaiConfigFile, "openai-config-file", "/etc/openai/config.yaml", "Path to the file containing the ChatGPT api token.")
-	fs.StringVar(&o.openaiModel, "openai-model", openai.GPT4, "OpenAI model, list ref: https://github.com/sashabaranov/go-openai/blob/master/completion.go#L15-L38")
+	fs.StringVar(&o.openaiModel, "openai-model", openai.GPT3Dot5Turbo, "OpenAI model, list ref: https://github.com/sashabaranov/go-openai/blob/master/completion.go#L15-L38")
 	fs.StringVar(&o.logLevel, "log-level", "debug", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	for _, group := range []flagutil.OptionGroup{&o.github, &o.instrumentationOptions} {
 		group.AddFlags(fs)

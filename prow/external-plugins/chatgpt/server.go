@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"path"
 	"regexp"
 	"strings"
 
@@ -34,9 +33,16 @@ import (
 	"k8s.io/test-infra/prow/plugins"
 )
 
-const pluginName = "chatgpt"
-const gitHostBaseURL = "https://github.com"
-const aiQuestionForeword = "Please help me to review the github pull request."
+const (
+	pluginName             = "chatgpt"
+	gitHostBaseURL         = "https://github.com"
+	openaiSystemMessage    = "You are an experienced software developer. You will act as a reviewer for a GitHub Pull Request, and you should answer by markdown format."
+	openaiMessageMaxLen    = 9000
+	openaiQuestionForeword = "Please help me to review the github pull request: summarize the key changes and identify potential problems, then give some fixing suggestions, all you output should be markdown."
+	botHeadnote            = `> **I have already done a preliminary review for you, and I hope to help you do a better job.**
+------
+`
+)
 
 var chatgptRe = regexp.MustCompile(`(?m)^/chatgpt\s+(.+)$`)
 
@@ -79,8 +85,9 @@ func HelpProvider(_ []config.OrgRepo) (*pluginhelp.PluginHelp, error) {
 type Server struct {
 	tokenGenerator func() []byte
 
-	openaiClient *openai.Client
-	openaiModel  string
+	openaiClient  *openai.Client
+	openaiModel   string
+	systemMessage string
 
 	ghc githubClient
 	log *logrus.Entry
@@ -141,7 +148,8 @@ func (s *Server) handlePullRequest(l *logrus.Entry, pre github.PullRequestEvent)
 	}
 
 	pr := pre.PullRequest
-	if pr.Mergable != nil && !*pr.Mergable {
+	// Skip not mergable or draft PR.
+	if pr.Draft || pr.Mergable != nil && !*pr.Mergable {
 		return nil
 	}
 
@@ -156,7 +164,7 @@ func (s *Server) handlePullRequest(l *logrus.Entry, pre github.PullRequestEvent)
 		github.PrLogField:   num,
 	})
 
-	return s.handle(l, nil, org, repo, num, "")
+	return s.handle(l, nil, &pr, "")
 }
 
 func (s *Server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent) error {
@@ -176,24 +184,58 @@ func (s *Server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent
 		github.PrLogField:   num,
 	})
 
+	pr, err := s.ghc.GetPullRequest(org, repo, num)
+	if err != nil {
+		return err
+	}
+
+	if pr.Mergable != nil && !*pr.Mergable {
+		return s.createComment(l, org, repo, num, &ic.Comment, "I Skip the comment since it is not mergable.")
+	}
+
 	// Ignore comments that are not commands
 	gptMatches := chatgptRe.FindAllStringSubmatch(ic.Comment.Body, -1)
-	if len(gptMatches) == 0 || len(gptMatches[0]) != 1 {
+	if len(gptMatches) == 0 || len(gptMatches[0]) != 2 {
 		return nil
 	}
 
-	return s.handle(l, &ic.Comment, org, repo, num, gptMatches[0][1])
+	return s.handle(l, &ic.Comment, pr, gptMatches[0][1])
 }
 
-func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, org, repo string, num int, foreword string) error {
+func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, pr *github.PullRequest, foreword string) error {
+	logger.Debug("call handle()")
 	if foreword == "" {
-		foreword = aiQuestionForeword
+		foreword = openaiQuestionForeword
 	}
 
-	prHTMLLink := path.Join(gitHostBaseURL, org, repo, "pull", fmt.Sprint(num))
+	org := pr.Base.Repo.Owner.Login
+	repo := pr.Base.Repo.Name
+	num := pr.Number
+
+	patch, err := s.ghc.GetPullRequestPatch(org, repo, num)
+	if err != nil {
+		return err
+	}
+	if len(patch) > openaiMessageMaxLen {
+		return s.createComment(logger, org, repo, num, comment, "I Skip it since changed size is too large")
+	}
+
 	message := strings.Join([]string{
 		foreword,
-		fmt.Sprintf("The pull request link: %s", prHTMLLink),
+		"This is the pr title:",
+		"```text",
+		pr.Title,
+
+		"```",
+		"These are the pr description:",
+		"```text",
+		pr.Body,
+		"```",
+
+		"This is the diff for the pull request:",
+		"```diff",
+		string(patch),
+		"```",
 	}, "\n")
 
 	resp, err := s.sendMessageToChatGPTServer(message)
@@ -208,9 +250,9 @@ func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, org,
 func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comment *github.IssueComment, resp string) error {
 	if err := func() error {
 		if comment != nil {
-			return s.ghc.CreateComment(org, repo, num, plugins.FormatICResponse(*comment, resp))
+			return s.ghc.CreateComment(org, repo, num, plugins.FormatICResponse(*comment, "\n"+resp))
 		}
-		return s.ghc.CreateComment(org, repo, num, fmt.Sprintf("In response to a chatgpt label: %s", resp))
+		return s.ghc.CreateComment(org, repo, num, fmt.Sprintf("%s\n%s", botHeadnote, resp))
 	}(); err != nil {
 		l.WithError(err).Warn("failed to create comment")
 		return err
@@ -227,6 +269,10 @@ func (s *Server) sendMessageToChatGPTServer(message string) (string, error) {
 			Model: s.openaiModel,
 			Messages: []openai.ChatCompletionMessage{
 				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: s.systemMessage,
+				},
+				{
 					Role:    openai.ChatMessageRoleUser,
 					Content: message,
 				},
@@ -239,7 +285,7 @@ func (s *Server) sendMessageToChatGPTServer(message string) (string, error) {
 	}
 
 	if len(resp.Choices) != 0 {
-		return resp.Choices[0].Message.Content, nil
+		return resp.Choices[len(resp.Choices)-1].Message.Content, nil
 	}
 
 	return "", nil
