@@ -17,23 +17,26 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"path"
 	"regexp"
 	"strings"
 
+	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/test-infra/prow/config"
-	"k8s.io/test-infra/prow/git/v2"
 	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/pluginhelp"
 	"k8s.io/test-infra/prow/plugins"
 )
 
 const pluginName = "chatgpt"
+const gitHostBaseURL = "https://github.com"
+const aiQuestionForeword = "Please help me to review the github pull request."
 
 var chatgptRe = regexp.MustCompile(`(?m)^/chatgpt\s+(.+)$`)
 
@@ -58,15 +61,15 @@ type githubClient interface {
 // HelpProvider construct the pluginhelp.PluginHelp for this plugin.
 func HelpProvider(_ []config.OrgRepo) (*pluginhelp.PluginHelp, error) {
 	pluginHelp := &pluginhelp.PluginHelp{
-		Description: `The chatgpt plugin is used for chatgpting PRs across branches. For every successful chatgpt invocation a new PR is opened against the target branch and assigned to the requestor. If the parent PR contains a release note, it is copied to the chatgpt PR.`,
+		Description: `The chatgpt plugin is used for reviewing the PR with OpenAI`,
 	}
 	pluginHelp.AddCommand(pluginhelp.Command{
-		Usage:       "/chatgpt [branch]",
-		Description: "chatgpt a PR to a different branch. This command works both in merged PRs (the chatgpt PR is opened immediately) and open PRs (the chatgpt PR opens as soon as the original PR merges).",
+		Usage:       "/chatgpt [you question]",
+		Description: "ask chatgpt for the PR. This command works both in PRs opened and updating events, also support comment on the opened PR.",
 		Featured:    true,
-		// depends on how the chatgpt server runs; needs auth by default (--allow-all=false)
-		WhoCanUse: "Members of the trusted organization for the repo.",
-		Examples:  []string{"/chatgpt release-3.9", "/chatgpt release-1.15"},
+		// depends on how the chatgpt plugin runs; needs auth by default (--allow-all=false)
+		WhoCanUse: "Anyone",
+		Examples:  []string{"/chatgpt could you help to review it?", "/chatgpt do you have any suggestions about this PR?"},
 	})
 	return pluginHelp, nil
 }
@@ -74,11 +77,11 @@ func HelpProvider(_ []config.OrgRepo) (*pluginhelp.PluginHelp, error) {
 // Server implements http.Handler. It validates incoming GitHub webhooks and
 // then dispatches them to the appropriate plugins.
 type Server struct {
-	tokenGenerator  func() []byte
-	chatGPTServer   string
-	chatGPTAPIToken string
+	tokenGenerator func() []byte
 
-	gc  git.ClientFactory
+	openaiClient *openai.Client
+	openaiModel  string
+
 	ghc githubClient
 	log *logrus.Entry
 }
@@ -153,7 +156,7 @@ func (s *Server) handlePullRequest(l *logrus.Entry, pre github.PullRequestEvent)
 		github.PrLogField:   num,
 	})
 
-	return s.handle(l, nil, org, repo, pr.Title, pr.Body, num)
+	return s.handle(l, nil, org, repo, num, "")
 }
 
 func (s *Server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent) error {
@@ -175,26 +178,25 @@ func (s *Server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent
 
 	// Ignore comments that are not commands
 	gptMatches := chatgptRe.FindAllStringSubmatch(ic.Comment.Body, -1)
-	if len(gptMatches) == 0 || len(gptMatches[0]) != 2 {
+	if len(gptMatches) == 0 || len(gptMatches[0]) != 1 {
 		return nil
 	}
 
-	pr, err := s.ghc.GetPullRequest(org, repo, num)
-	if err != nil {
-		return fmt.Errorf("failed to get pull request %s/%s#%d: %w", org, repo, num, err)
-	}
-
-	return s.handle(l, &ic.Comment, org, repo, pr.Title, pr.Body, num)
+	return s.handle(l, &ic.Comment, org, repo, num, gptMatches[0][1])
 }
 
-func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, org, repo, title, body string, num int) error {
-	diff, err := s.ghc.GetPullRequestPatch(org, repo, num)
-	if err != nil {
-		logger.Errorf("Failed to get PR diff: %v", err)
-		return err
+func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, org, repo string, num int, foreword string) error {
+	if foreword == "" {
+		foreword = aiQuestionForeword
 	}
 
-	resp, err := s.sendMessageToChatGPTServer(title, body, diff)
+	prHTMLLink := path.Join(gitHostBaseURL, org, repo, "pull", fmt.Sprint(num))
+	message := strings.Join([]string{
+		foreword,
+		fmt.Sprintf("The pull request link: %s", prHTMLLink),
+	}, "\n")
+
+	resp, err := s.sendMessageToChatGPTServer(message)
 	if err != nil {
 		logger.Errorf("Failed to send message to ChatGPT server: %v", err)
 		return err
@@ -218,38 +220,27 @@ func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comme
 	return nil
 }
 
-func (s *Server) sendMessageToChatGPTServer(title, desc string, diff []byte) (string, error) {
-	type payload struct {
-		Title string `json:"title"`
-		Diff  []byte `json:"diff"`
-	}
+func (s *Server) sendMessageToChatGPTServer(message string) (string, error) {
+	resp, err := s.openaiClient.CreateChatCompletion(
+		context.Background(),
+		openai.ChatCompletionRequest{
+			Model: s.openaiModel,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: message,
+				},
+			},
+		},
+	)
 
-	p := payload{
-		Title: title,
-		Diff:  diff,
-	}
-
-	pBytes, err := json.Marshal(p)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("ChatCompletion error: %w", err)
 	}
 
-	resp, err := http.Post(s.chatGPTServer, "application/json", strings.NewReader(string(pBytes)))
-	if err != nil {
-		return "", err
+	if len(resp.Choices) != 0 {
+		return resp.Choices[0].Message.Content, nil
 	}
 
-	defer resp.Body.Close()
-
-	respBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var response map[string]interface{}
-	if err := json.Unmarshal(respBytes, &response); err != nil {
-		return "", err
-	}
-
-	return response["response"].(string), nil
+	return "", nil
 }

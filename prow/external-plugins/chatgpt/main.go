@@ -19,12 +19,15 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 
 	"k8s.io/test-infra/pkg/flagutil"
 	"k8s.io/test-infra/prow/config/secret"
@@ -38,8 +41,8 @@ import (
 type options struct {
 	port int
 
-	chatgptServer    string
-	chatGptTokenFile string
+	openaiConfigFile string
+	openaiModel      string
 
 	dryRun                 bool
 	github                 prowflagutil.GitHubOptions
@@ -47,6 +50,15 @@ type options struct {
 	logLevel               string
 
 	webhookSecretFile string
+}
+
+type openaiConfig struct {
+	Token      string `yaml:"token,omitempty" json:"token,omitempty"`
+	BaseURL    string `yaml:"base_url,omitempty" json:"base_url,omitempty"`
+	OrgID      string `yaml:"org_id,omitempty" json:"org_id,omitempty"`
+	APIType    string `yaml:"api_type,omitempty" json:"api_type,omitempty"`       // OPEN_AI | AZURE | AZURE_AD
+	APIVersion string `yaml:"api_version,omitempty" json:"api_version,omitempty"` // 2023-03-15-preview, required when APIType is APITypeAzure or APITypeAzureAD
+	Engine     string `yaml:"engine,omitempty" json:"engine,omitempty"`           // required when APIType is APITypeAzure or APITypeAzureAD
 }
 
 func (o *options) Validate() error {
@@ -65,14 +77,38 @@ func gatherOptions() options {
 	fs.IntVar(&o.port, "port", 8080, "Port to listen on.")
 	fs.BoolVar(&o.dryRun, "dry-run", true, "Dry run for testing. Uses API tokens but does not mutate.")
 	fs.StringVar(&o.webhookSecretFile, "hmac-secret-file", "/etc/webhook/hmac", "Path to the file containing the GitHub HMAC secret.")
-	fs.StringVar(&o.chatgptServer, "chatgpt-server", "https://openai.com", "Base url to ChatGPT server")
-	fs.StringVar(&o.chatgptServer, "chatgpt-token-file", "/etc/chatgpt/token", "Path to the file containing the ChatGPT api token.")
+	fs.StringVar(&o.openaiConfigFile, "openai-config-file", "/etc/openai/config.yaml", "Path to the file containing the ChatGPT api token.")
+	fs.StringVar(&o.openaiModel, "openai-model", openai.GPT4, "OpenAI model, list ref: https://github.com/sashabaranov/go-openai/blob/master/completion.go#L15-L38")
 	fs.StringVar(&o.logLevel, "log-level", "debug", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	for _, group := range []flagutil.OptionGroup{&o.github, &o.instrumentationOptions} {
 		group.AddFlags(fs)
 	}
 	fs.Parse(os.Args[1:])
 	return o
+}
+
+func newOpenAIClient(yamlCfgFile string) (*openai.Client, error) {
+	// Read the contents of the file into a byte slice
+	content, err := ioutil.ReadFile(yamlCfgFile)
+	if err != nil {
+		return nil, fmt.Errorf("Error reading file: %w", err)
+	}
+
+	// Unmarshal the YAML data into a Config struct
+	var cfg openaiConfig
+	err = yaml.Unmarshal(content, &cfg)
+	if err != nil {
+		return nil, fmt.Errorf("Error unmarshaling YAML: %w", err)
+	}
+
+	openaiCfg := openai.DefaultConfig(cfg.Token)
+	openaiCfg.BaseURL = cfg.BaseURL
+	openaiCfg.OrgID = cfg.OrgID
+	openaiCfg.APIType = openai.APIType(cfg.APIType)
+	openaiCfg.APIVersion = cfg.APIVersion
+	openaiCfg.Engine = cfg.Engine
+
+	return openai.NewClientWithConfig(openaiCfg), nil
 }
 
 func main() {
@@ -97,24 +133,18 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Fatal("Error getting GitHub client.")
 	}
-	gitClient, err := o.github.GitClientFactory("", nil, o.dryRun)
-	if err != nil {
-		logrus.WithError(err).Fatal("Error getting Git client.")
-	}
-	interrupts.OnInterrupt(func() {
-		if err := gitClient.Clean(); err != nil {
-			logrus.WithError(err).Error("Could not clean up git client cache.")
-		}
-	})
 
-	// TODO(wuhuizuo): verify chatgpt api token.
+	openaiClient, err := newOpenAIClient(o.openaiConfigFile)
+	if err != nil {
+		logrus.WithError(err).Fatal("Error create OpenAI client.")
+	}
 
 	server := &Server{
 		tokenGenerator: secret.GetTokenGenerator(o.webhookSecretFile),
-
-		gc:  gitClient,
-		ghc: githubClient,
-		log: log,
+		ghc:            githubClient,
+		openaiClient:   openaiClient,
+		openaiModel:    o.openaiModel,
+		log:            log,
 	}
 
 	health := pjutil.NewHealthOnPort(o.instrumentationOptions.HealthPort)

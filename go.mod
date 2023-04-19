@@ -71,6 +71,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
+	github.com/sashabaranov/go-openai v1.8.0
 	github.com/shurcooL/githubv4 v0.0.0-20210725200734-83ba7b4c9228
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
