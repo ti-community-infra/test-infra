@@ -238,7 +238,7 @@ func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, pr *
 		"```",
 	}, "\n")
 
-	resp, err := s.sendMessageToChatGPTServer(message)
+	resp, err := s.sendMessageToChatGPTServer(logger, message)
 	if err != nil {
 		logger.Errorf("Failed to send message to ChatGPT server: %v", err)
 		return err
@@ -262,7 +262,7 @@ func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comme
 	return nil
 }
 
-func (s *Server) sendMessageToChatGPTServer(message string) (string, error) {
+func (s *Server) sendMessageToChatGPTServer(logger *logrus.Entry, message string) (string, error) {
 	resp, err := s.openaiClient.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
@@ -283,6 +283,13 @@ func (s *Server) sendMessageToChatGPTServer(message string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("ChatCompletion error: %w", err)
 	}
+
+	logger.WithFields(logrus.Fields{
+		"model":             resp.Model,
+		"total_tokens":      resp.Usage.TotalTokens,
+		"completion_tokens": resp.Usage.CompletionTokens,
+		"prompt_tokens":     resp.Usage.PromptTokens,
+	}).Debug("openai token usage.")
 
 	if len(resp.Choices) != 0 {
 		return resp.Choices[len(resp.Choices)-1].Message.Content, nil
