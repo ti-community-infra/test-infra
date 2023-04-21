@@ -217,6 +217,8 @@ func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, pr *
 		return err
 	}
 	if len(patch) > openaiMessageMaxLen {
+		logger.Debugf("patch size is %d bytes", len(patch))
+		logger.Debugf("patch content is: %s", patch)
 		return s.createComment(logger, org, repo, num, comment, "I Skip it since changed size is too large")
 	}
 
@@ -240,8 +242,9 @@ func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, pr *
 
 	resp, err := s.sendMessageToChatGPTServer(logger, message)
 	if err != nil {
-		logger.Errorf("Failed to send message to ChatGPT server: %v", err)
-		return err
+		logger.Errorf("Failed to send message to OpenAI server: %v", err)
+		return s.createComment(logger, org, repo, num, comment,
+			 "Sorry, failed to send message to OpenAI server!")
 	}
 
 	return s.createComment(logger, org, repo, num, comment, resp)
