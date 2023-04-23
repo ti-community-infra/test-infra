@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
@@ -212,7 +213,7 @@ func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, pr *
 	repo := pr.Base.Repo.Name
 	num := pr.Number
 
-	patch, err := s.ghc.GetPullRequestPatch(org, repo, num)
+	patch, err := s.getPullRequestPatch(logger, org, repo, num)
 	if err != nil {
 		return err
 	}
@@ -244,10 +245,26 @@ func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, pr *
 	if err != nil {
 		logger.Errorf("Failed to send message to OpenAI server: %v", err)
 		return s.createComment(logger, org, repo, num, comment,
-			 "Sorry, failed to send message to OpenAI server!")
+			"Sorry, failed to send message to OpenAI server!")
 	}
 
 	return s.createComment(logger, org, repo, num, comment, resp)
+}
+
+func (s *Server) getPullRequestPatch(l *logrus.Entry, org, repo string, num int) ([]byte, error) {
+	patch, err := s.ghc.GetPullRequestPatch(org, repo, num)
+	if err != nil {
+		return nil, err
+	}
+
+	// when first opened. the patch content will be json info of the pull request.
+	if patch[0] == '{' {
+		l.Debug("got pr info in json format")
+		time.Sleep(time.Second * 5)
+		return s.getPullRequestPatch(l, org, repo, num)
+	}
+
+	return patch, nil
 }
 
 func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comment *github.IssueComment, resp string) error {
