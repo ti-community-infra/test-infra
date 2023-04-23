@@ -35,14 +35,9 @@ import (
 )
 
 const (
-	pluginName             = "chatgpt"
-	gitHostBaseURL         = "https://github.com"
-	openaiSystemMessage    = "You are an experienced software developer. You will act as a reviewer for a GitHub Pull Request, and you should answer by markdown format."
-	openaiMessageMaxLen    = 9000
-	openaiQuestionForeword = "Please help me to review the github pull request: summarize the key changes and identify potential problems, then give some fixing suggestions, all you output should be markdown."
-	botHeadnote            = `> **I have already done a preliminary review for you, and I hope to help you do a better job.**
-------
-`
+	pluginName          = "chatgpt"
+	gitHostBaseURL      = "https://github.com"
+	openaiMessageMaxLen = 9000
 )
 
 var chatgptRe = regexp.MustCompile(`(?m)^/chatgpt\s+(.+)$`)
@@ -86,9 +81,9 @@ func HelpProvider(_ []config.OrgRepo) (*pluginhelp.PluginHelp, error) {
 type Server struct {
 	tokenGenerator func() []byte
 
-	openaiClient  *openai.Client
-	openaiModel   string
-	systemMessage string
+	openaiModel     string
+	openaiClient    *openai.Client
+	openaiTaskAgent *ConfigAgent
 
 	ghc githubClient
 	log *logrus.Entry
@@ -165,7 +160,7 @@ func (s *Server) handlePullRequest(l *logrus.Entry, pre github.PullRequestEvent)
 		github.PrLogField:   num,
 	})
 
-	return s.handle(l, nil, &pr, "")
+	return s.handle(l, &pr, nil, "")
 }
 
 func (s *Server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent) error {
@@ -200,15 +195,10 @@ func (s *Server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent
 		return nil
 	}
 
-	return s.handle(l, &ic.Comment, pr, gptMatches[0][1])
+	return s.handle(l, pr, &ic.Comment, gptMatches[0][1])
 }
 
-func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, pr *github.PullRequest, foreword string) error {
-	logger.Debug("call handle()")
-	if foreword == "" {
-		foreword = openaiQuestionForeword
-	}
-
+func (s *Server) handle(logger *logrus.Entry, pr *github.PullRequest, comment *github.IssueComment, foreword string) error {
 	org := pr.Base.Repo.Owner.Login
 	repo := pr.Base.Repo.Name
 	num := pr.Number
@@ -223,32 +213,34 @@ func (s *Server) handle(logger *logrus.Entry, comment *github.IssueComment, pr *
 		return s.createComment(logger, org, repo, num, comment, "I Skip it since changed size is too large")
 	}
 
-	message := strings.Join([]string{
-		foreword,
-		"This is the pr title:",
-		"```text",
-		pr.Title,
-
-		"```",
-		"These are the pr description:",
-		"```text",
-		pr.Body,
-		"```",
-
-		"This is the diff for the pull request:",
-		"```diff",
-		string(patch),
-		"```",
-	}, "\n")
-
-	resp, err := s.sendMessageToChatGPTServer(logger, message)
+	tasks, err := s.getTasks(org, repo, foreword)
 	if err != nil {
-		logger.Errorf("Failed to send message to OpenAI server: %v", err)
-		return s.createComment(logger, org, repo, num, comment,
-			"Sorry, failed to send message to OpenAI server!")
+		logger.WithError(err).Error("Failed to get tasks")
+		return err
 	}
 
-	return s.createComment(logger, org, repo, num, comment, resp)
+	for n, task := range tasks {
+		if err := s.taskRun(logger.WithField("ai-task", n), &task, pr, string(patch), comment); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Server) getTasks(org, repo, foreword string) (map[string]TaskConfig, error) {
+	if foreword != "" {
+		return s.openaiTaskAgent.TasksFor(org, repo)
+	}
+
+	tasks := map[string]TaskConfig{
+		"user-comment-trigger": {
+			SystemMessage:        defaultSystemMessage,
+			UserPrompt:           defaultPromte,
+			PatchIntroducePrompt: defaultPrPatchIntroducePromte,
+		},
+	}
+	return tasks, nil
 }
 
 func (s *Server) getPullRequestPatch(l *logrus.Entry, org, repo string, num int) ([]byte, error) {
@@ -267,12 +259,43 @@ func (s *Server) getPullRequestPatch(l *logrus.Entry, org, repo string, num int)
 	return patch, nil
 }
 
+func (s *Server) taskRun(logger *logrus.Entry, task *TaskConfig, pr *github.PullRequest, patch string, comment *github.IssueComment) error {
+	message := strings.Join([]string{
+		task.UserPrompt,
+		"This is the pr title:",
+		"```text",
+		pr.Title,
+
+		"```",
+		"These are the pr description:",
+		"```text",
+		pr.Body,
+		"```",
+		task.PatchIntroducePrompt,
+		"```diff",
+		patch,
+		"```",
+	}, "\n")
+
+	resp, err := s.sendMessageToChatGPTServer(logger, task.SystemMessage, message)
+	if err != nil {
+		logger.Errorf("Failed to send message to OpenAI server: %v", err)
+		return s.createComment(logger, pr.Base.Repo.Owner.Login, pr.Base.Repo.Name, pr.Number, comment,
+			"Sorry, failed to send message to OpenAI server!")
+	}
+
+	if task.OutputStaticHeadNote != "" {
+		resp = fmt.Sprintf("%s\n%s", task.OutputStaticHeadNote, resp)
+	}
+	return s.createComment(logger, pr.Base.Repo.Owner.Login, pr.Base.Repo.Name, pr.Number, comment, resp)
+}
+
 func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comment *github.IssueComment, resp string) error {
 	if err := func() error {
 		if comment != nil {
 			return s.ghc.CreateComment(org, repo, num, plugins.FormatICResponse(*comment, "\n"+resp))
 		}
-		return s.ghc.CreateComment(org, repo, num, fmt.Sprintf("%s\n%s", botHeadnote, resp))
+		return s.ghc.CreateComment(org, repo, num, resp)
 	}(); err != nil {
 		l.WithError(err).Warn("failed to create comment")
 		return err
@@ -282,7 +305,7 @@ func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comme
 	return nil
 }
 
-func (s *Server) sendMessageToChatGPTServer(logger *logrus.Entry, message string) (string, error) {
+func (s *Server) sendMessageToChatGPTServer(logger *logrus.Entry, systemMessage, userMessage string) (string, error) {
 	resp, err := s.openaiClient.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
@@ -290,11 +313,11 @@ func (s *Server) sendMessageToChatGPTServer(logger *logrus.Entry, message string
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleSystem,
-					Content: s.systemMessage,
+					Content: systemMessage,
 				},
 				{
 					Role:    openai.ChatMessageRoleUser,
-					Content: message,
+					Content: userMessage,
 				},
 			},
 		},
