@@ -35,12 +35,11 @@ import (
 )
 
 const (
-	pluginName          = "chatgpt"
-	gitHostBaseURL      = "https://github.com"
-	openaiMessageMaxLen = 9000
+	pluginName              = "chatgpt"
+	gitHostBaseURL          = "https://github.com"
+	openaiMessageMaxLen     = 9000
+	defaultIssueReviewWorld = "default"
 )
-
-var chatgptRe = regexp.MustCompile(`(?m)^/chatgpt\s+(.+)$`)
 
 type githubClient interface {
 	AddLabel(org, repo string, number int, label string) error
@@ -81,9 +80,10 @@ func HelpProvider(_ []config.OrgRepo) (*pluginhelp.PluginHelp, error) {
 type Server struct {
 	tokenGenerator func() []byte
 
-	openaiModel     string
-	openaiClient    *openai.Client
-	openaiTaskAgent *ConfigAgent
+	openaiModel            string
+	openaiClient           *openai.Client
+	openaiTaskAgent        *ConfigAgent
+	issueCommentMatchRegex *regexp.Regexp
 
 	ghc githubClient
 	log *logrus.Entry
@@ -190,12 +190,17 @@ func (s *Server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent
 	}
 
 	// Ignore comments that are not commands
-	gptMatches := chatgptRe.FindAllStringSubmatch(ic.Comment.Body, -1)
+	gptMatches := s.issueCommentMatchRegex.FindAllStringSubmatch(ic.Comment.Body, -1)
 	if len(gptMatches) == 0 || len(gptMatches[0]) != 2 {
 		return nil
 	}
 
-	return s.handle(l, pr, &ic.Comment, gptMatches[0][1])
+	foreword := gptMatches[0][1]
+	if foreword == defaultIssueReviewWorld {
+		foreword = defaultPromte
+	}
+
+	return s.handle(l, pr, &ic.Comment, foreword)
 }
 
 func (s *Server) handle(logger *logrus.Entry, pr *github.PullRequest, comment *github.IssueComment, foreword string) error {

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -44,6 +45,7 @@ type options struct {
 	openaiModel              string
 	opeaiTasksFile           string
 	opeaiTasksReloadInterval time.Duration
+	issueCommentCommand      string
 
 	dryRun                 bool
 	github                 prowflagutil.GitHubOptions
@@ -82,6 +84,7 @@ func gatherOptions() options {
 	fs.StringVar(&o.opeaiTasksFile, "openai-tasks-file", "/etc/openai/tasks.yaml", "Path to the file containing the default openai tasks.")
 	fs.DurationVar(&o.opeaiTasksReloadInterval, "openai-tasks-reload-interval", time.Minute, "Interval to reload the openai tasks file.")
 	fs.StringVar(&o.openaiModel, "openai-model", openai.GPT3Dot5Turbo, "OpenAI model, list ref: https://github.com/sashabaranov/go-openai/blob/master/completion.go#L15-L38")
+	fs.StringVar(&o.issueCommentCommand, "issue-comment-command", "review", "comment command to match for, such as `command1` (you should send comment with `/command1 ...`)")
 	fs.StringVar(&o.logLevel, "log-level", "debug", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	for _, group := range []flagutil.OptionGroup{&o.github, &o.instrumentationOptions} {
 		group.AddFlags(fs)
@@ -147,13 +150,15 @@ func main() {
 		logrus.WithError(err).Fatal("Failed to start task agent")
 	}
 
+	issueCommentMatchRegex := regexp.MustCompile(fmt.Sprintf(`(?m)^/%s\s+(.+)$`, o.issueCommentCommand))
 	server := &Server{
-		tokenGenerator:  secret.GetTokenGenerator(o.webhookSecretFile),
-		ghc:             githubClient,
-		openaiClient:    openaiClient,
-		openaiModel:     o.openaiModel,
-		openaiTaskAgent: taskAgent,
-		log:             log,
+		ghc:                    githubClient,
+		issueCommentMatchRegex: issueCommentMatchRegex,
+		log:                    log,
+		openaiClient:           openaiClient,
+		openaiModel:            o.openaiModel,
+		openaiTaskAgent:        taskAgent,
+		tokenGenerator:         secret.GetTokenGenerator(o.webhookSecretFile),
 	}
 
 	health := pjutil.NewHealthOnPort(o.instrumentationOptions.HealthPort)
