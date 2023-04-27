@@ -3,10 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"path"
 	"sync"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -114,9 +118,17 @@ func (c *ConfigAgent) Reload(file string) error {
 	}
 
 	config := Config{}
-	err = json.Unmarshal(data, &config)
-	if err != nil {
-		return fmt.Errorf("could not unmarshal JSON config: %w", err)
+	switch path.Ext(file) {
+	case ".json":
+		if err := json.Unmarshal(data, &config); err != nil {
+			return fmt.Errorf("could not unmarshal JSON config: %w", err)
+		}
+	case ".yaml", ".yml":
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			return fmt.Errorf("could not unmarshal YAML config: %w", err)
+		}
+	default:
+		return errors.New("only support file with `.json` or `.yaml` extension")
 	}
 
 	// Set config.
@@ -144,6 +156,6 @@ func (c *ConfigAgent) TasksFor(org, repo string) (map[string]TaskConfig, error) 
 	}
 
 	return map[string]TaskConfig{
-		"default": TaskConfig{},
+		"default": {},
 	}, nil
 }
