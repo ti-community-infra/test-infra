@@ -238,14 +238,14 @@ func (s *Server) handle(logger *logrus.Entry, pr *github.PullRequest, comment *g
 }
 
 func (s *Server) getTasks(org, repo, foreword string) (map[string]TaskConfig, error) {
-	if foreword != "" {
+	if foreword == "" {
 		return s.openaiTaskAgent.TasksFor(org, repo)
 	}
 
 	tasks := map[string]TaskConfig{
 		"user-comment-trigger": {
 			SystemMessage:        defaultSystemMessage,
-			UserPrompt:           defaultPromte,
+			UserPrompt:           foreword,
 			PatchIntroducePrompt: defaultPrPatchIntroducePromte,
 		},
 	}
