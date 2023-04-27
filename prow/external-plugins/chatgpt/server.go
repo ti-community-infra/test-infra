@@ -190,12 +190,15 @@ func (s *Server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent
 	}
 
 	// Ignore comments that are not commands
-	gptMatches := s.issueCommentMatchRegex.FindAllStringSubmatch(ic.Comment.Body, -1)
-	if len(gptMatches) == 0 || len(gptMatches[0]) != 2 {
+	l.Debugf("comment content: %s", ic.Comment.Body)
+	l.Debugf("match regexp: %s", s.issueCommentMatchRegex)
+	commentMatches := s.issueCommentMatchRegex.FindAllStringSubmatch(ic.Comment.Body, -1)
+	l.Debugf("comment matches: %#v", commentMatches)
+	if len(commentMatches) == 0 || len(commentMatches[0]) != 2 {
 		return nil
 	}
 
-	foreword := gptMatches[0][1]
+	foreword := commentMatches[0][1]
 	if foreword == defaultIssueReviewWorld {
 		foreword = defaultPromte
 	}
@@ -208,6 +211,7 @@ func (s *Server) handle(logger *logrus.Entry, pr *github.PullRequest, comment *g
 	repo := pr.Base.Repo.Name
 	num := pr.Number
 
+	logger.Debug("start handle...")
 	patch, err := s.getPullRequestPatch(logger, org, repo, num)
 	if err != nil {
 		return err
@@ -265,6 +269,7 @@ func (s *Server) getPullRequestPatch(l *logrus.Entry, org, repo string, num int)
 }
 
 func (s *Server) taskRun(logger *logrus.Entry, task *TaskConfig, pr *github.PullRequest, patch string, comment *github.IssueComment) error {
+	logger.Debugf("start deal task %s...", task.Name)
 	message := strings.Join([]string{
 		task.UserPrompt,
 		"This is the pr title:",
