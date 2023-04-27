@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
@@ -93,7 +92,7 @@ func gatherOptions() options {
 
 func newOpenAIClient(yamlCfgFile string) (*openai.Client, error) {
 	// Read the contents of the file into a byte slice
-	content, err := ioutil.ReadFile(yamlCfgFile)
+	content, err := os.ReadFile(yamlCfgFile)
 	if err != nil {
 		return nil, fmt.Errorf("Error reading file: %w", err)
 	}
