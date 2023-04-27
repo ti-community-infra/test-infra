@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -99,6 +100,7 @@ func (c *ConfigAgent) WatchConfig(ctx context.Context, interval time.Duration, o
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			logrus.Debug("ticker")
 			info, err := os.Stat(c.path)
 			if err != nil {
 				fmt.Printf("Error getting file info: %v\n", err)
@@ -149,13 +151,13 @@ func (c *ConfigAgent) TasksFor(org, repo string) (map[string]TaskConfig, error) 
 	if ok {
 		return repoTasks, nil
 	}
+	logrus.Debugf("no tasks for repo: %s", fullName)
 
-	orgTasks, ok := c.config[repo]
+	orgTasks, ok := c.config[org]
 	if ok {
 		return orgTasks, nil
 	}
-
-	return map[string]TaskConfig{
-		"default": {},
-	}, nil
+	logrus.Debugf("no tasks for org %s", org)
+	logrus.Debugf("all tasks: %#v", c.config)
+	return nil, nil
 }
