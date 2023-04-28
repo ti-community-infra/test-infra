@@ -60,19 +60,24 @@ type githubClient interface {
 }
 
 // HelpProvider construct the pluginhelp.PluginHelp for this plugin.
-func HelpProvider(_ []config.OrgRepo) (*pluginhelp.PluginHelp, error) {
-	pluginHelp := &pluginhelp.PluginHelp{
-		Description: `The chatgpt plugin is used for reviewing the PR with OpenAI`,
+func HelpProviderFactory(command string) func(_ []config.OrgRepo) (*pluginhelp.PluginHelp, error) {
+	return func(_ []config.OrgRepo) (*pluginhelp.PluginHelp, error) {
+		pluginHelp := &pluginhelp.PluginHelp{
+			Description: `The chatgpt plugin is used for reviewing the PR with OpenAI`,
+		}
+		pluginHelp.AddCommand(pluginhelp.Command{
+			Usage:       fmt.Sprintf("/%s [you question]", command),
+			Description: "ask chatgpt for the PR. This command works both in PRs opened and updating events, also support comment on the opened PR.",
+			Featured:    true,
+			// depends on how the plugin runs; needs auth by default (--allow-all=false)
+			WhoCanUse: "Anyone",
+			Examples: []string{
+				fmt.Sprintf("/%s default", command),
+				fmt.Sprintf("/%s do you have any suggestions about this PR?", command),
+			},
+		})
+		return pluginHelp, nil
 	}
-	pluginHelp.AddCommand(pluginhelp.Command{
-		Usage:       "/chatgpt [you question]",
-		Description: "ask chatgpt for the PR. This command works both in PRs opened and updating events, also support comment on the opened PR.",
-		Featured:    true,
-		// depends on how the chatgpt plugin runs; needs auth by default (--allow-all=false)
-		WhoCanUse: "Anyone",
-		Examples:  []string{"/chatgpt could you help to review it?", "/chatgpt do you have any suggestions about this PR?"},
-	})
-	return pluginHelp, nil
 }
 
 // Server implements http.Handler. It validates incoming GitHub webhooks and

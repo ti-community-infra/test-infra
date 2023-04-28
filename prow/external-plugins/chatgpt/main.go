@@ -166,7 +166,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", server)
-	externalplugins.ServeExternalPluginHelp(mux, log, HelpProvider)
+	externalplugins.ServeExternalPluginHelp(mux, log, HelpProviderFactory(o.issueCommentCommand))
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(o.port), Handler: mux}
 	defer interrupts.WaitForGracefulShutdown()
 	interrupts.ListenAndServe(httpServer, 5*time.Second)
