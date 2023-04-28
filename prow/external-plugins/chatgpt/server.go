@@ -174,6 +174,12 @@ func (s *Server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent
 		return nil
 	}
 
+	// Ignore comments that are not commands
+	commentMatches := s.issueCommentMatchRegex.FindAllStringSubmatch(ic.Comment.Body, -1)
+	if len(commentMatches) == 0 || len(commentMatches[0]) != 2 {
+		return nil
+	}
+
 	org := ic.Repo.Owner.Login
 	repo := ic.Repo.Name
 	num := ic.Issue.Number
@@ -192,15 +198,6 @@ func (s *Server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent
 
 	if pr.Mergable != nil && !*pr.Mergable {
 		return s.createComment(l, org, repo, num, &ic.Comment, "I Skip the comment since it is not mergable.")
-	}
-
-	// Ignore comments that are not commands
-	l.Debugf("comment content: %s", ic.Comment.Body)
-	l.Debugf("match regexp: %s", s.issueCommentMatchRegex)
-	commentMatches := s.issueCommentMatchRegex.FindAllStringSubmatch(ic.Comment.Body, -1)
-	l.Debugf("comment matches: %#v", commentMatches)
-	if len(commentMatches) == 0 || len(commentMatches[0]) != 2 {
-		return nil
 	}
 
 	foreword := commentMatches[0][1]
