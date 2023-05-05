@@ -50,7 +50,7 @@ type githubClient interface {
 	CreateIssue(org, repo, title, body string, milestone int, labels, assignees []string) (int, error)
 	EnsureFork(forkingUser, org, repo string) (string, error)
 	GetPullRequest(org, repo string, number int) (*github.PullRequest, error)
-	GetPullRequestPatch(org, repo string, number int) ([]byte, error)
+	GetPullRequestDiff(org, repo string, number int) ([]byte, error)
 	GetPullRequests(org, repo string) ([]github.PullRequest, error)
 	GetRepo(owner, name string) (github.FullRepo, error)
 	IsMember(org, user string) (bool, error)
@@ -214,13 +214,13 @@ func (s *Server) handle(logger *logrus.Entry, pr *github.PullRequest, comment *g
 	num := pr.Number
 
 	logger.Debug("start handle...")
-	patch, err := s.getPullRequestPatch(logger, org, repo, num)
+	diff, err := s.getPullRequestDiff(logger, org, repo, num)
 	if err != nil {
 		return err
 	}
-	if len(patch) > openaiMessageMaxLen {
-		logger.Debugf("patch size is %d bytes", len(patch))
-		logger.Debugf("patch content is: %s", patch)
+	if len(diff) > openaiMessageMaxLen {
+		logger.Debugf("diff size is %d bytes", len(diff))
+		logger.Debugf("diff content is: %s", diff)
 		return s.createComment(logger, org, repo, num, comment, "I Skip it since changed size is too large")
 	}
 
@@ -231,7 +231,7 @@ func (s *Server) handle(logger *logrus.Entry, pr *github.PullRequest, comment *g
 	}
 
 	for n, task := range tasks {
-		if err := s.taskRun(logger.WithField("ai-task", n), &task, pr, string(patch), comment); err != nil {
+		if err := s.taskRun(logger.WithField("ai-task", n), &task, pr, string(diff), comment); err != nil {
 			return err
 		}
 	}
@@ -254,20 +254,20 @@ func (s *Server) getTasks(org, repo, foreword string) (map[string]TaskConfig, er
 	return tasks, nil
 }
 
-func (s *Server) getPullRequestPatch(l *logrus.Entry, org, repo string, num int) ([]byte, error) {
-	patch, err := s.ghc.GetPullRequestPatch(org, repo, num)
+func (s *Server) getPullRequestDiff(l *logrus.Entry, org, repo string, num int) ([]byte, error) {
+	diff, err := s.ghc.GetPullRequestDiff(org, repo, num)
 	if err != nil {
 		return nil, err
 	}
 
 	// when first opened. the patch content will be json info of the pull request.
-	if patch[0] == '{' {
+	if diff[0] == '{' {
 		l.Debug("got pr info in json format")
 		time.Sleep(time.Second * 5)
-		return s.getPullRequestPatch(l, org, repo, num)
+		return s.getPullRequestDiff(l, org, repo, num)
 	}
 
-	return patch, nil
+	return diff, nil
 }
 
 func (s *Server) taskRun(logger *logrus.Entry, task *TaskConfig, pr *github.PullRequest, patch string, comment *github.IssueComment) error {
