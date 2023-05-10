@@ -35,10 +35,23 @@ import (
 )
 
 const (
-	pluginName              = "chatgpt"
-	gitHostBaseURL          = "https://github.com"
-	openaiMessageMaxLen     = 9000
-	defaultIssueReviewWorld = "default"
+	pluginName                  = "chatgpt"
+	gitHostBaseURL              = "https://github.com"
+	openaiMessageMaxLen         = 9000
+	maxDiffLenAccept            = 10 * openaiMessageMaxLen
+	defaultIssueReviewWorld     = "default"
+	splitInstructionMessageText = `The total length of the content that I want to send you is too large to send in only one piece.
+
+For sending you that content, I will follow this rule:
+
+[START PART 1/10]
+this is the content of the part 1 out of 10 in total
+[END PART 1/10]
+
+Then you just answer: "Received part 1/10"
+
+And when I tell you "ALL PARTS SENT", then you can continue processing the data and answering my requests.
+`
 )
 
 type githubClient interface {
@@ -218,10 +231,10 @@ func (s *Server) handle(logger *logrus.Entry, pr *github.PullRequest, comment *g
 	if err != nil {
 		return err
 	}
-	if len(diff) > openaiMessageMaxLen {
-		logger.Debugf("diff size is %d bytes", len(diff))
-		logger.Debugf("diff content is: %s", diff)
-		return s.createComment(logger, org, repo, num, comment, "I Skip it since changed size is too large")
+	if len(diff) > maxDiffLenAccept {
+		skipMessage := fmt.Sprintf("I Skip it since the diff size(%d bytes > %d bytes) is too large", len(diff), maxDiffLenAccept)
+		logger.Debug(skipMessage)
+		return s.createComment(logger, org, repo, num, comment, skipMessage)
 	}
 
 	tasks, err := s.getTasks(org, repo, foreword)
@@ -289,7 +302,7 @@ func (s *Server) taskRun(logger *logrus.Entry, task *TaskConfig, pr *github.Pull
 		"```",
 	}, "\n")
 
-	resp, err := s.sendMessageToChatGPTServer(logger, task.SystemMessage, message)
+	resp, err := s.sendMessageToChatGPTServer(logger, task.SystemMessage, splitUserMessage(message, openaiMessageMaxLen))
 	if err != nil {
 		logger.Errorf("Failed to send message to OpenAI server: %v", err)
 		return s.createComment(logger, pr.Base.Repo.Owner.Login, pr.Base.Repo.Name, pr.Number, comment,
@@ -300,6 +313,47 @@ func (s *Server) taskRun(logger *logrus.Entry, task *TaskConfig, pr *github.Pull
 		resp = fmt.Sprintf("%s\n%s", task.OutputStaticHeadNote, resp)
 	}
 	return s.createComment(logger, pr.Base.Repo.Owner.Login, pr.Base.Repo.Name, pr.Number, comment, resp)
+}
+
+func splitUserMessage(messageText string, splitLen int) []string {
+	if len(messageText) <= splitLen {
+		return []string{messageText}
+	}
+
+	partCount := len(messageText) / splitLen
+	if partCount*splitLen < len(messageText) {
+		partCount += 1
+	}
+
+	var messages []string
+	for i := 0; i < partCount; i++ {
+		var chunkMessageLines []string
+		isLast := i == partCount-1
+
+		partFlag := fmt.Sprintf("PART %d/%d", i+1, partCount)
+		startPos := splitLen * i
+		endPos := startPos + splitLen
+		if isLast {
+			endPos = len(messageText)
+		}
+
+		if !isLast {
+			chunkMessageLines = append(chunkMessageLines,
+				fmt.Sprintf(`Do not answer yet. This is just another part of the text I want to send you. Just receive and acknowledge as "%s received" and wait for the next part.`, partFlag))
+		}
+		chunkMessageLines = append(chunkMessageLines,
+			fmt.Sprintf("[START PART %s]", partFlag),
+			messageText[startPos:endPos],
+			fmt.Sprintf("[END PART %s]", partFlag),
+		)
+		if isLast {
+			chunkMessageLines = append(chunkMessageLines, "ALL PARTS SENT. Now you can continue processing the request.")
+		}
+
+		messages = append(messages, strings.Join(chunkMessageLines, "\n"))
+	}
+
+	return messages
 }
 
 func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comment *github.IssueComment, resp string) error {
@@ -317,21 +371,26 @@ func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comme
 	return nil
 }
 
-func (s *Server) sendMessageToChatGPTServer(logger *logrus.Entry, systemMessage, userMessage string) (string, error) {
+func (s *Server) sendMessageToChatGPTServer(logger *logrus.Entry, systemMessage string, userMessages []string) (string, error) {
+	completionMessages := []openai.ChatCompletionMessage{
+		{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: systemMessage,
+		},
+	}
+
+	for _, um := range userMessages {
+		completionMessages = append(completionMessages, openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleUser,
+			Content: um,
+		})
+	}
+
 	resp, err := s.openaiClient.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model: s.openaiModel,
-			Messages: []openai.ChatCompletionMessage{
-				{
-					Role:    openai.ChatMessageRoleSystem,
-					Content: systemMessage,
-				},
-				{
-					Role:    openai.ChatMessageRoleUser,
-					Content: userMessage,
-				},
-			},
+			Model:    s.openaiModel,
+			Messages: completionMessages,
 		},
 	)
 
