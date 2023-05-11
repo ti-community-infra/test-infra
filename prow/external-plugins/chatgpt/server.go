@@ -38,6 +38,7 @@ const (
 	pluginName                  = "chatgpt"
 	gitHostBaseURL              = "https://github.com"
 	defaultIssueReviewWorld     = "default"
+	splitorHoldingByteCount     = 200
 	splitInstructionMessageText = `The total length of the content that I want to send you is too large to send in only one piece.
 
 For sending you that content, I will follow this rule:
@@ -303,7 +304,7 @@ func (s *Server) taskRun(logger *logrus.Entry, task *TaskConfig, pr *github.Pull
 		"```",
 	}, "\n")
 
-	resp, err := s.sendMessageToChatGPTServer(logger, task.SystemMessage, splitUserMessage(message, s.openaiMaxMessageItemLen))
+	resp, err := s.sendMessageToChatGPTServer(logger, task.SystemMessage, splitUserMessage(message, s.openaiMaxMessageItemLen-splitorHoldingByteCount))
 	if err != nil {
 		logger.Errorf("Failed to send message to OpenAI server: %v", err)
 		return s.createComment(logger, pr.Base.Repo.Owner.Login, pr.Base.Repo.Name, pr.Number, comment,
@@ -343,9 +344,9 @@ func splitUserMessage(messageText string, splitLen int) []string {
 				fmt.Sprintf(`Do not answer yet. This is just another part of the text I want to send you. Just receive and acknowledge as "%s received" and wait for the next part.`, partFlag))
 		}
 		chunkMessageLines = append(chunkMessageLines,
-			fmt.Sprintf("[START PART %s]", partFlag),
+			fmt.Sprintf("[START %s]", partFlag),
 			messageText[startPos:endPos],
-			fmt.Sprintf("[END PART %s]", partFlag),
+			fmt.Sprintf("[END %s]", partFlag),
 		)
 		if isLast {
 			chunkMessageLines = append(chunkMessageLines, "ALL PARTS SENT. Now you can continue processing the request.")
@@ -373,44 +374,34 @@ func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comme
 }
 
 func (s *Server) sendMessageToChatGPTServer(logger *logrus.Entry, systemMessage string, userMessages []string) (string, error) {
-	logger.Debugf("system message len: %d", len(systemMessage))
-	completionMessages := []openai.ChatCompletionMessage{
-		{
-			Role:    openai.ChatMessageRoleSystem,
-			Content: systemMessage,
-		},
-	}
-
+	var result string
 	for i, um := range userMessages {
 		logger.Debugf("user message[%d] len: %d", i, len(um))
-		completionMessages = append(completionMessages, openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleUser,
-			Content: um,
+		resp, err := s.openaiClient.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: systemMessage,
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: um,
+				},
+			},
 		})
+		if err != nil {
+			return "", fmt.Errorf("ChatCompletion error: %w", err)
+		}
+		logger.WithFields(logrus.Fields{
+			"model":             resp.Model,
+			"total_tokens":      resp.Usage.TotalTokens,
+			"completion_tokens": resp.Usage.CompletionTokens,
+			"prompt_tokens":     resp.Usage.PromptTokens,
+		}).Debug("openai token usage.")
+
+		result = resp.Choices[0].Message.Content
+		logger.Debugf("response: %s", result)
 	}
 
-	resp, err := s.openaiClient.CreateChatCompletion(
-		context.Background(),
-		openai.ChatCompletionRequest{
-			Model:    s.openaiModel,
-			Messages: completionMessages,
-		},
-	)
-
-	if err != nil {
-		return "", fmt.Errorf("ChatCompletion error: %w", err)
-	}
-
-	logger.WithFields(logrus.Fields{
-		"model":             resp.Model,
-		"total_tokens":      resp.Usage.TotalTokens,
-		"completion_tokens": resp.Usage.CompletionTokens,
-		"prompt_tokens":     resp.Usage.PromptTokens,
-	}).Debug("openai token usage.")
-
-	if len(resp.Choices) != 0 {
-		return resp.Choices[len(resp.Choices)-1].Message.Content, nil
-	}
-
-	return "", nil
+	return result, nil
 }
