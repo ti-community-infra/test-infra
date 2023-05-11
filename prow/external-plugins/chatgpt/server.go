@@ -37,8 +37,6 @@ import (
 const (
 	pluginName                  = "chatgpt"
 	gitHostBaseURL              = "https://github.com"
-	openaiMessageMaxLen         = 9000
-	maxDiffLenAccept            = 10 * openaiMessageMaxLen
 	defaultIssueReviewWorld     = "default"
 	splitInstructionMessageText = `The total length of the content that I want to send you is too large to send in only one piece.
 
@@ -98,9 +96,12 @@ func HelpProviderFactory(command string) func(_ []config.OrgRepo) (*pluginhelp.P
 type Server struct {
 	tokenGenerator func() []byte
 
-	openaiModel            string
-	openaiClient           *openai.Client
-	openaiTaskAgent        *ConfigAgent
+	openaiModel              string
+	openaiClient             *openai.Client
+	openaiTaskAgent          *ConfigAgent
+	openaiMaxMessageItemLen  int
+	openaiMaxMessageTotalLen int
+
 	issueCommentMatchRegex *regexp.Regexp
 
 	ghc githubClient
@@ -231,8 +232,8 @@ func (s *Server) handle(logger *logrus.Entry, pr *github.PullRequest, comment *g
 	if err != nil {
 		return err
 	}
-	if len(diff) > maxDiffLenAccept {
-		skipMessage := fmt.Sprintf("I Skip it since the diff size(%d bytes > %d bytes) is too large", len(diff), maxDiffLenAccept)
+	if len(diff) > s.openaiMaxMessageTotalLen {
+		skipMessage := fmt.Sprintf("I Skip it since the diff size(%d bytes > %d bytes) is too large", len(diff), s.openaiMaxMessageTotalLen)
 		logger.Debug(skipMessage)
 		return s.createComment(logger, org, repo, num, comment, skipMessage)
 	}
@@ -302,7 +303,7 @@ func (s *Server) taskRun(logger *logrus.Entry, task *TaskConfig, pr *github.Pull
 		"```",
 	}, "\n")
 
-	resp, err := s.sendMessageToChatGPTServer(logger, task.SystemMessage, splitUserMessage(message, openaiMessageMaxLen))
+	resp, err := s.sendMessageToChatGPTServer(logger, task.SystemMessage, splitUserMessage(message, s.openaiMaxMessageItemLen))
 	if err != nil {
 		logger.Errorf("Failed to send message to OpenAI server: %v", err)
 		return s.createComment(logger, pr.Base.Repo.Owner.Login, pr.Base.Repo.Name, pr.Number, comment,
@@ -372,6 +373,7 @@ func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comme
 }
 
 func (s *Server) sendMessageToChatGPTServer(logger *logrus.Entry, systemMessage string, userMessages []string) (string, error) {
+	logger.Debugf("system message len: %d", len(systemMessage))
 	completionMessages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
@@ -379,7 +381,8 @@ func (s *Server) sendMessageToChatGPTServer(logger *logrus.Entry, systemMessage 
 		},
 	}
 
-	for _, um := range userMessages {
+	for i, um := range userMessages {
+		logger.Debugf("user message[%d] len: %d", i, len(um))
 		completionMessages = append(completionMessages, openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleUser,
 			Content: um,

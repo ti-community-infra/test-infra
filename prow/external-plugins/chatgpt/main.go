@@ -41,12 +41,14 @@ import (
 type options struct {
 	port int
 
-	openaiConfigFile         string
-	openaiModel              string
-	opeaiTasksFile           string
-	opeaiTasksReloadInterval time.Duration
-	issueCommentCommand      string
+	openaiConfigFile          string
+	openaiModel               string
+	openaiTasksFile           string
+	openaiTasksReloadInterval time.Duration
+	openaiMaxMessageItemLen   int
+	openaiMaxMessageTotalLen  int
 
+	issueCommentCommand    string
 	dryRun                 bool
 	github                 prowflagutil.GitHubOptions
 	instrumentationOptions prowflagutil.InstrumentationOptions
@@ -81,9 +83,11 @@ func gatherOptions() options {
 	fs.BoolVar(&o.dryRun, "dry-run", true, "Dry run for testing. Uses API tokens but does not mutate.")
 	fs.StringVar(&o.webhookSecretFile, "hmac-secret-file", "/etc/webhook/hmac", "Path to the file containing the GitHub HMAC secret.")
 	fs.StringVar(&o.openaiConfigFile, "openai-config-file", "/etc/openai/config.yaml", "Path to the file containing the ChatGPT api token.")
-	fs.StringVar(&o.opeaiTasksFile, "openai-tasks-file", "/etc/openai/tasks.yaml", "Path to the file containing the default openai tasks.")
-	fs.DurationVar(&o.opeaiTasksReloadInterval, "openai-tasks-reload-interval", time.Minute, "Interval to reload the openai tasks file.")
+	fs.StringVar(&o.openaiTasksFile, "openai-tasks-file", "/etc/openai/tasks.yaml", "Path to the file containing the default openai tasks.")
+	fs.DurationVar(&o.openaiTasksReloadInterval, "openai-tasks-reload-interval", time.Minute, "Interval to reload the openai tasks file.")
 	fs.StringVar(&o.openaiModel, "openai-model", openai.GPT3Dot5Turbo, "OpenAI model, list ref: https://github.com/sashabaranov/go-openai/blob/master/completion.go#L15-L38")
+	fs.IntVar(&o.openaiMaxMessageItemLen, "openai-max-message-item-len", 8000, "maximum context length for single message")
+	fs.IntVar(&o.openaiMaxMessageTotalLen, "openai-max-message-total-len", 80000, "maximum total length of messages send for a chat")
 	fs.StringVar(&o.issueCommentCommand, "issue-comment-command", "review", "comment command to match for, such as `command1` (you should send comment with `/command1 ...`)")
 	fs.StringVar(&o.logLevel, "log-level", "debug", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	for _, group := range []flagutil.OptionGroup{&o.github, &o.instrumentationOptions} {
@@ -145,20 +149,22 @@ func main() {
 		logrus.WithError(err).Fatal("Error create OpenAI client.")
 	}
 
-	taskAgent, err := NewConfigAgent(o.opeaiTasksFile, o.opeaiTasksReloadInterval)
+	taskAgent, err := NewConfigAgent(o.openaiTasksFile, o.openaiTasksReloadInterval)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to start task agent")
 	}
 
 	issueCommentMatchRegex := regexp.MustCompile(fmt.Sprintf(`(?m)^/%s\s+(.+)$`, o.issueCommentCommand))
 	server := &Server{
-		ghc:                    githubClient,
-		issueCommentMatchRegex: issueCommentMatchRegex,
-		log:                    log,
-		openaiClient:           openaiClient,
-		openaiModel:            o.openaiModel,
-		openaiTaskAgent:        taskAgent,
-		tokenGenerator:         secret.GetTokenGenerator(o.webhookSecretFile),
+		ghc:                      githubClient,
+		issueCommentMatchRegex:   issueCommentMatchRegex,
+		log:                      log,
+		openaiClient:             openaiClient,
+		openaiModel:              o.openaiModel,
+		openaiTaskAgent:          taskAgent,
+		openaiMaxMessageItemLen:  o.openaiMaxMessageItemLen,
+		openaiMaxMessageTotalLen: o.openaiMaxMessageTotalLen,
+		tokenGenerator:           secret.GetTokenGenerator(o.webhookSecretFile),
 	}
 
 	health := pjutil.NewHealthOnPort(o.instrumentationOptions.HealthPort)
