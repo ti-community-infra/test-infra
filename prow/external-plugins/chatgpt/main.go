@@ -25,9 +25,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 
 	"k8s.io/test-infra/pkg/flagutil"
 	"k8s.io/test-infra/prow/config/secret"
@@ -41,29 +39,22 @@ import (
 type options struct {
 	port int
 
-	openaiConfigFile          string
-	openaiModel               string
-	openaiTasksFile           string
-	openaiTasksReloadInterval time.Duration
-	openaiMaxMessageItemLen   int
-	openaiMaxMessageTotalLen  int
+	openaiConfigFile           string
+	openaiConfigFileLarge      string
+	openaiTasksFile            string
+	openaiConfigReloadInterval time.Duration
+	openaiTasksReloadInterval  time.Duration
 
-	issueCommentCommand    string
+	largeDownThreshold  int
+	maxAcceptDiffSize   int
+	issueCommentCommand string
+
 	dryRun                 bool
 	github                 prowflagutil.GitHubOptions
 	instrumentationOptions prowflagutil.InstrumentationOptions
 	logLevel               string
 
 	webhookSecretFile string
-}
-
-type openaiConfig struct {
-	Token      string `yaml:"token,omitempty" json:"token,omitempty"`
-	BaseURL    string `yaml:"base_url,omitempty" json:"base_url,omitempty"`
-	OrgID      string `yaml:"org_id,omitempty" json:"org_id,omitempty"`
-	APIType    string `yaml:"api_type,omitempty" json:"api_type,omitempty"`       // OPEN_AI | AZURE | AZURE_AD
-	APIVersion string `yaml:"api_version,omitempty" json:"api_version,omitempty"` // 2023-03-15-preview, required when APIType is APITypeAzure or APITypeAzureAD
-	Engine     string `yaml:"engine,omitempty" json:"engine,omitempty"`           // required when APIType is APITypeAzure or APITypeAzureAD, it's the deploy instance name.
 }
 
 func (o *options) Validate() error {
@@ -82,12 +73,13 @@ func gatherOptions() options {
 	fs.IntVar(&o.port, "port", 8888, "Port to listen on.")
 	fs.BoolVar(&o.dryRun, "dry-run", true, "Dry run for testing. Uses API tokens but does not mutate.")
 	fs.StringVar(&o.webhookSecretFile, "hmac-secret-file", "/etc/webhook/hmac", "Path to the file containing the GitHub HMAC secret.")
-	fs.StringVar(&o.openaiConfigFile, "openai-config-file", "/etc/openai/config.yaml", "Path to the file containing the ChatGPT api token.")
+	fs.StringVar(&o.openaiConfigFile, "openai-config-file", "/etc/openai/config.yaml", "Path to the file containing the access credential.")
+	fs.StringVar(&o.openaiConfigFileLarge, "openai-config-file-large", "", "Path to the file containing the access credential route for large pull requests.")
+	fs.DurationVar(&o.openaiConfigReloadInterval, "openai-config-reload-interval", time.Minute, "Interval to reload the openai access credential file.")
 	fs.StringVar(&o.openaiTasksFile, "openai-tasks-file", "/etc/openai/tasks.yaml", "Path to the file containing the default openai tasks.")
 	fs.DurationVar(&o.openaiTasksReloadInterval, "openai-tasks-reload-interval", time.Minute, "Interval to reload the openai tasks file.")
-	fs.StringVar(&o.openaiModel, "openai-model", openai.GPT3Dot5Turbo, "OpenAI model, list ref: https://github.com/sashabaranov/go-openai/blob/master/completion.go#L15-L38")
-	fs.IntVar(&o.openaiMaxMessageItemLen, "openai-max-message-item-len", 8000, "maximum context length for single message")
-	fs.IntVar(&o.openaiMaxMessageTotalLen, "openai-max-message-total-len", 80000, "maximum total length of messages send for a chat")
+	fs.IntVar(&o.largeDownThreshold, "large-down-threshold", 3*4096, "down threshold bytes of message will route to client given by `openai-config-file-large` option.")
+	fs.IntVar(&o.maxAcceptDiffSize, "max-accept-diff-size", 80000, "maximum bytes of PR diff")
 	fs.StringVar(&o.issueCommentCommand, "issue-comment-command", "review", "comment command to match for, such as `command1` (you should send comment with `/command1 ...`)")
 	fs.StringVar(&o.logLevel, "log-level", "debug", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	for _, group := range []flagutil.OptionGroup{&o.github, &o.instrumentationOptions} {
@@ -95,30 +87,6 @@ func gatherOptions() options {
 	}
 	fs.Parse(os.Args[1:])
 	return o
-}
-
-func newOpenAIClient(yamlCfgFile string) (*openai.Client, error) {
-	// Read the contents of the file into a byte slice
-	content, err := os.ReadFile(yamlCfgFile)
-	if err != nil {
-		return nil, fmt.Errorf("Error reading file: %w", err)
-	}
-
-	// Unmarshal the YAML data into a Config struct
-	var cfg openaiConfig
-	err = yaml.Unmarshal(content, &cfg)
-	if err != nil {
-		return nil, fmt.Errorf("Error unmarshaling YAML: %w", err)
-	}
-
-	openaiCfg := openai.DefaultConfig(cfg.Token)
-	openaiCfg.BaseURL = cfg.BaseURL
-	openaiCfg.OrgID = cfg.OrgID
-	openaiCfg.APIType = openai.APIType(cfg.APIType)
-	openaiCfg.APIVersion = cfg.APIVersion
-	openaiCfg.Engine = cfg.Engine
-
-	return openai.NewClientWithConfig(openaiCfg), nil
 }
 
 func main() {
@@ -144,27 +112,25 @@ func main() {
 		logrus.WithError(err).Fatal("Error getting GitHub client.")
 	}
 
-	openaiClient, err := newOpenAIClient(o.openaiConfigFile)
+	openaiAgent, err := NewWrapOpenaiAgent(o.openaiConfigFile, o.openaiConfigFileLarge, o.largeDownThreshold, o.openaiConfigReloadInterval)
 	if err != nil {
-		logrus.WithError(err).Fatal("Error create OpenAI client.")
+		logrus.WithError(err).Fatal("Error load OpenAI config.")
 	}
 
-	taskAgent, err := NewConfigAgent(o.openaiTasksFile, o.openaiTasksReloadInterval)
+	taskAgent, err := NewTaskAgent(o.openaiTasksFile, o.openaiTasksReloadInterval)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to start task agent")
 	}
 
 	issueCommentMatchRegex := regexp.MustCompile(fmt.Sprintf(`(?m)^/%s\s+(.+)$`, o.issueCommentCommand))
 	server := &Server{
-		ghc:                      githubClient,
-		issueCommentMatchRegex:   issueCommentMatchRegex,
-		log:                      log,
-		openaiClient:             openaiClient,
-		openaiModel:              o.openaiModel,
-		openaiTaskAgent:          taskAgent,
-		openaiMaxMessageItemLen:  o.openaiMaxMessageItemLen,
-		openaiMaxMessageTotalLen: o.openaiMaxMessageTotalLen,
-		tokenGenerator:           secret.GetTokenGenerator(o.webhookSecretFile),
+		ghc:                    githubClient,
+		issueCommentMatchRegex: issueCommentMatchRegex,
+		log:                    log,
+		openaiClientAgent:      openaiAgent,
+		openaiTaskAgent:        taskAgent,
+		maxDiffSize:            o.maxAcceptDiffSize,
+		tokenGenerator:         secret.GetTokenGenerator(o.webhookSecretFile),
 	}
 
 	health := pjutil.NewHealthOnPort(o.instrumentationOptions.HealthPort)

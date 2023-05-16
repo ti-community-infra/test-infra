@@ -97,13 +97,11 @@ func HelpProviderFactory(command string) func(_ []config.OrgRepo) (*pluginhelp.P
 type Server struct {
 	tokenGenerator func() []byte
 
-	openaiModel              string
-	openaiClient             *openai.Client
-	openaiTaskAgent          *ConfigAgent
-	openaiMaxMessageItemLen  int
-	openaiMaxMessageTotalLen int
+	openaiClientAgent *OpenaiWrapAgent
+	openaiTaskAgent   *TaskAgent
 
 	issueCommentMatchRegex *regexp.Regexp
+	maxDiffSize            int
 
 	ghc githubClient
 	log *logrus.Entry
@@ -216,9 +214,6 @@ func (s *Server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent
 	}
 
 	foreword := commentMatches[0][1]
-	if foreword == defaultIssueReviewWorld {
-		foreword = defaultPromte
-	}
 
 	return s.handle(l, pr, &ic.Comment, foreword)
 }
@@ -233,8 +228,8 @@ func (s *Server) handle(logger *logrus.Entry, pr *github.PullRequest, comment *g
 	if err != nil {
 		return err
 	}
-	if len(diff) > s.openaiMaxMessageTotalLen {
-		skipMessage := fmt.Sprintf("I Skip it since the diff size(%d bytes > %d bytes) is too large", len(diff), s.openaiMaxMessageTotalLen)
+	if len(diff) > s.maxDiffSize {
+		skipMessage := fmt.Sprintf("I Skip it since the diff size(%d bytes > %d bytes) is too large", len(diff), s.maxDiffSize)
 		logger.Debug(skipMessage)
 		return s.createComment(logger, org, repo, num, comment, skipMessage)
 	}
@@ -246,7 +241,7 @@ func (s *Server) handle(logger *logrus.Entry, pr *github.PullRequest, comment *g
 	}
 
 	for n, task := range tasks {
-		if err := s.taskRun(logger.WithField("ai-task", n), &task, pr, string(diff), comment); err != nil {
+		if err := s.taskRun(logger.WithField("ai-task", n), task, pr, string(diff), comment); err != nil {
 			return err
 		}
 	}
@@ -254,19 +249,29 @@ func (s *Server) handle(logger *logrus.Entry, pr *github.PullRequest, comment *g
 	return nil
 }
 
-func (s *Server) getTasks(org, repo, foreword string) (map[string]TaskConfig, error) {
-	if foreword == "" {
-		return s.openaiTaskAgent.TasksFor(org, repo)
-	}
+func (s *Server) getTasks(org, repo, foreword string) (map[string]*Task, error) {
+	switch foreword {
+	case defaultIssueReviewWorld:
+		task, err := s.openaiTaskAgent.Task(org, repo, foreword, true)
+		if err != nil {
+			return nil, err
+		}
 
-	tasks := map[string]TaskConfig{
-		"user-comment-trigger": {
-			SystemMessage:        defaultSystemMessage,
-			UserPrompt:           foreword,
-			PatchIntroducePrompt: defaultPrPatchIntroducePromte,
-		},
+		if task == nil {
+			return nil, err
+		}
+
+		tasks := map[string]*Task{"user-comment-trigger": task}
+		return tasks, nil
+	case "":
+		return s.openaiTaskAgent.TasksFor(org, repo)
+	default:
+		task := s.openaiTaskAgent.DefaultTask()
+		task.UserPrompt = foreword
+
+		tasks := map[string]*Task{"user-comment-trigger": task}
+		return tasks, nil
 	}
-	return tasks, nil
 }
 
 func (s *Server) getPullRequestDiff(l *logrus.Entry, org, repo string, num int) ([]byte, error) {
@@ -285,8 +290,8 @@ func (s *Server) getPullRequestDiff(l *logrus.Entry, org, repo string, num int) 
 	return diff, nil
 }
 
-func (s *Server) taskRun(logger *logrus.Entry, task *TaskConfig, pr *github.PullRequest, patch string, comment *github.IssueComment) error {
-	logger.Debugf("start deal task %s...", task.Name)
+func (s *Server) taskRun(logger *logrus.Entry, task *Task, pr *github.PullRequest, patch string, comment *github.IssueComment) error {
+	logger.Debugf("start deal task %s...", task.Description)
 	message := strings.Join([]string{
 		task.UserPrompt,
 		"This is the pr title:",
@@ -294,7 +299,7 @@ func (s *Server) taskRun(logger *logrus.Entry, task *TaskConfig, pr *github.Pull
 		pr.Title,
 
 		"```",
-		"These are the pr description:",
+		"This is the pr description:",
 		"```text",
 		pr.Body,
 		"```",
@@ -304,11 +309,11 @@ func (s *Server) taskRun(logger *logrus.Entry, task *TaskConfig, pr *github.Pull
 		"```",
 	}, "\n")
 
-	resp, err := s.sendMessageToChatGPTServer(logger, task.SystemMessage, splitUserMessage(message, s.openaiMaxMessageItemLen-splitorHoldingByteCount))
+	resp, err := s.chatWithAIServer(logger, task.SystemMessage, message, task.MaxResponseTokens)
 	if err != nil {
 		logger.Errorf("Failed to send message to OpenAI server: %v", err)
 		return s.createComment(logger, pr.Base.Repo.Owner.Login, pr.Base.Repo.Name, pr.Number, comment,
-			"Sorry, failed to send message to OpenAI server!")
+			"Sorry, some error happened!")
 	}
 
 	if task.OutputStaticHeadNote != "" {
@@ -317,45 +322,53 @@ func (s *Server) taskRun(logger *logrus.Entry, task *TaskConfig, pr *github.Pull
 	return s.createComment(logger, pr.Base.Repo.Owner.Login, pr.Base.Repo.Name, pr.Number, comment, resp)
 }
 
-func splitUserMessage(messageText string, splitLen int) []string {
-	if len(messageText) <= splitLen {
-		return []string{messageText}
+func (s *Server) chatWithAIServer(logger *logrus.Entry, systemMessage string, message string, maxResponseTokens int) (string, error) {
+	msgLen := len(message)
+	logger.Debugf("user message len: %d", msgLen)
+
+	openaiClient, model := s.openaiClientAgent.ClientFor(msgLen)
+	messages := []openai.ChatCompletionMessage{
+		{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: systemMessage,
+		},
+		{
+			Role:    openai.ChatMessageRoleUser,
+			Content: message,
+		},
 	}
 
-	partCount := len(messageText) / splitLen
-	if partCount*splitLen < len(messageText) {
-		partCount += 1
+	needTokens, err := numTokensFromMessages(messages, model)
+	if err != nil {
+		logger.Error(err)
+		return "", err
+	}
+	logger.Debugf("need tokens: %d", needTokens)
+	for needTokens+maxResponseTokens >= maxTokens[model] {
+		return "", fmt.Errorf("message too large(need tokens: %d)", needTokens)
 	}
 
-	var messages []string
-	for i := 0; i < partCount; i++ {
-		var chunkMessageLines []string
-		isLast := i == partCount-1
-
-		partFlag := fmt.Sprintf("PART %d/%d", i+1, partCount)
-		startPos := splitLen * i
-		endPos := startPos + splitLen
-		if isLast {
-			endPos = len(messageText)
-		}
-
-		if !isLast {
-			chunkMessageLines = append(chunkMessageLines,
-				fmt.Sprintf(`Do not answer yet. This is just another part of the text I want to send you. Just receive and acknowledge as "%s received" and wait for the next part.`, partFlag))
-		}
-		chunkMessageLines = append(chunkMessageLines,
-			fmt.Sprintf("[START %s]", partFlag),
-			messageText[startPos:endPos],
-			fmt.Sprintf("[END %s]", partFlag),
-		)
-		if isLast {
-			chunkMessageLines = append(chunkMessageLines, "ALL PARTS SENT. Now you can continue processing the request.")
-		}
-
-		messages = append(messages, strings.Join(chunkMessageLines, "\n"))
+	resp, err := openaiClient.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
+		Model:       model,
+		MaxTokens:   maxResponseTokens,
+		Temperature: defaultTemperature,
+		Messages:    messages,
+	})
+	if err != nil {
+		return "", fmt.Errorf("ChatCompletion error: %w", err)
 	}
 
-	return messages
+	result := resp.Choices[0].Message.Content
+	if isTruncated := resp.Choices[0].FinishReason == "length"; isTruncated {
+		result += "\n......\n> Response is trunked for length limits."
+	}
+	logger.WithField("model", resp.Model).Debugf(
+		"openai token usage: (total: %d, prompt: %d, completion: %d)",
+		resp.Usage.TotalTokens, resp.Usage.PromptTokens, resp.Usage.CompletionTokens,
+	)
+	logger.Debugf("response: %s", result)
+
+	return result, nil
 }
 
 func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comment *github.IssueComment, resp string) error {
@@ -371,37 +384,4 @@ func (s *Server) createComment(l *logrus.Entry, org, repo string, num int, comme
 
 	logrus.Debug("Created comment")
 	return nil
-}
-
-func (s *Server) sendMessageToChatGPTServer(logger *logrus.Entry, systemMessage string, userMessages []string) (string, error) {
-	var result string
-	for i, um := range userMessages {
-		logger.Debugf("user message[%d] len: %d", i, len(um))
-		resp, err := s.openaiClient.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
-			Messages: []openai.ChatCompletionMessage{
-				{
-					Role:    openai.ChatMessageRoleSystem,
-					Content: systemMessage,
-				},
-				{
-					Role:    openai.ChatMessageRoleUser,
-					Content: um,
-				},
-			},
-		})
-		if err != nil {
-			return "", fmt.Errorf("ChatCompletion error: %w", err)
-		}
-		logger.WithFields(logrus.Fields{
-			"model":             resp.Model,
-			"total_tokens":      resp.Usage.TotalTokens,
-			"completion_tokens": resp.Usage.CompletionTokens,
-			"prompt_tokens":     resp.Usage.PromptTokens,
-		}).Debug("openai token usage.")
-
-		result = resp.Choices[0].Message.Content
-		logger.Debugf("response: %s", result)
-	}
-
-	return result, nil
 }

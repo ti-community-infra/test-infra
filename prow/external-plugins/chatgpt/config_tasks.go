@@ -2,33 +2,32 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
-	"path"
-	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 )
 
 const (
 	defaultSystemMessage          = "You are an experienced software developer. You will act as a reviewer for a GitHub Pull Request, and you should answer by markdown format."
-	defaultPromte                 = "Please help me to review the github pull request: summarize the key changes and identify potential problems, then give some fixing suggestions, all you output should be markdown."
+	defaultPromte                 = "Please identify potential problems and give some fixing suggestions."
 	defaultPrPatchIntroducePromte = "This is the diff for the pull request:"
+	defaultMaxResponseTokens      = 500
+	defaultTemperature            = 0.7
 	defaultStaticOutHeadnote      = `> **I have already done a preliminary review for you, and I hope to help you do a better job.**
 ------
 `
 )
 
-// Config represent the plugin configuration
+// TasksConfig represent the all tasks store for the plugin.
 //
-// layer: org|repo / task / task-config
-type Config map[string]map[string]TaskConfig
+// layer: org|repo / task-name / task-config
+type TasksConfig map[string]RepoTasks
 
-// TaskConfig reprensent the config for AI task item.
+// RepoTasks represent the tasks for a repo or ORG.
+type RepoTasks map[string]*Task
+
+// Task reprensent the config for AI task item.
 //
 // $SystemMessage
 // --------------
@@ -47,12 +46,13 @@ type Config map[string]map[string]TaskConfig
 // > responses from AI server.
 //
 // TODO(wuhuizuo): using go template to comose the question.
-type TaskConfig struct {
-	Name                 string             `yaml:"name,omitempty" json:"name,omitempty"`
+type Task struct {
+	Description          string             `yaml:"description,omitempty" json:"description,omitempty"`
 	SystemMessage        string             `yaml:"system_message,omitempty" json:"system_message,omitempty"`
 	UserPrompt           string             `yaml:"user_prompt,omitempty" json:"user_prompt,omitempty"`
 	PatchIntroducePrompt string             `yaml:"patch_introduce_prompt,omitempty" json:"patch_introduce_prompt,omitempty"`
 	OutputStaticHeadNote string             `yaml:"output_static_head_note,omitempty" json:"output_static_head_note,omitempty"`
+	MaxResponseTokens    int                `yaml:"max_response_tokens,omitempty" json:"max_response_tokens,omitempty"`
 	ExternalContexts     []*ExternalContext `yaml:"external_contexts,omitempty" json:"external_contexts,omitempty"`
 }
 
@@ -60,12 +60,6 @@ type ExternalContext struct {
 	PromptTpl  string `yaml:"prompt_tpl,omitempty" json:"prompt_tpl,omitempty"`
 	ResURL     string `yaml:"res_url,omitempty" json:"res_url,omitempty"`
 	resContent []byte
-}
-
-type ConfigAgent struct {
-	path   string
-	config Config
-	mu     sync.RWMutex
 }
 
 func (ec *ExternalContext) Content() ([]byte, error) {
@@ -76,9 +70,14 @@ func (ec *ExternalContext) Content() ([]byte, error) {
 	return ec.resContent, nil
 }
 
-// NewConfigAgent returns a new ConfigLoader.
-func NewConfigAgent(path string, watchInterval time.Duration) (*ConfigAgent, error) {
-	c := &ConfigAgent{path: path}
+// TaskAgent agent for fetch tasks with watching and hot reload.
+type TaskAgent struct {
+	ConfigAgent[TasksConfig]
+}
+
+// NewTaskAgent returns a new ConfigLoader.
+func NewTaskAgent(path string, watchInterval time.Duration) (*TaskAgent, error) {
+	c := &TaskAgent{ConfigAgent: ConfigAgent[TasksConfig]{path: path}}
 	err := c.Reload(path)
 	if err != nil {
 		return nil, err
@@ -89,65 +88,13 @@ func NewConfigAgent(path string, watchInterval time.Duration) (*ConfigAgent, err
 	return c, nil
 }
 
-// WatchConfig monitors a file for changes and sends a message on the channel when the file changes
-func (c *ConfigAgent) WatchConfig(ctx context.Context, interval time.Duration, onChangeHandler func(f string) error) {
-	var lastMod time.Time
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			logrus.Debug("ticker")
-			info, err := os.Stat(c.path)
-			if err != nil {
-				fmt.Printf("Error getting file info: %v\n", err)
-			} else if modTime := info.ModTime(); modTime.After(lastMod) {
-				lastMod = modTime
-				onChangeHandler(c.path)
-			}
-		}
-	}
-}
-
-// Reload read and update config data.
-func (c *ConfigAgent) Reload(file string) error {
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return fmt.Errorf("could no load config file %s: %w", file, err)
-	}
-
-	config := Config{}
-	switch path.Ext(file) {
-	case ".json":
-		if err := json.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("could not unmarshal JSON config: %w", err)
-		}
-	case ".yaml", ".yml":
-		if err := yaml.Unmarshal(data, &config); err != nil {
-			return fmt.Errorf("could not unmarshal YAML config: %w", err)
-		}
-	default:
-		return errors.New("only support file with `.json` or `.yaml` extension")
-	}
-
-	// Set config.
-	c.mu.Lock()
-	c.config = config
-	c.mu.Unlock()
-
-	return nil
-}
-
 // Get return the config data.
-func (c *ConfigAgent) TasksFor(org, repo string) (map[string]TaskConfig, error) {
+func (c *TaskAgent) TasksFor(org, repo string) (map[string]*Task, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	fullName := fmt.Sprintf("%s/%s", org, repo)
-	repoTasks, ok := c.config[fullName]
+	repoTasks, ok := c.Data()[fullName]
 	if ok {
 		return repoTasks, nil
 	}
@@ -160,4 +107,32 @@ func (c *ConfigAgent) TasksFor(org, repo string) (map[string]TaskConfig, error) 
 	logrus.Debugf("no tasks for org %s", org)
 	logrus.Debugf("all tasks: %#v", c.config)
 	return nil, nil
+}
+
+// Task return the given task config.
+func (c *TaskAgent) Task(org, repo, taskName string, needDefault bool) (*Task, error) {
+	tasks, err := c.TasksFor(org, repo)
+	if err != nil {
+		return nil, err
+	}
+
+	task := tasks[taskName]
+	if task != nil {
+		return task, nil
+	}
+
+	if needDefault {
+		return c.DefaultTask(), nil
+	}
+
+	return nil, nil
+}
+
+func (c *TaskAgent) DefaultTask() *Task {
+	return &Task{
+		SystemMessage:        defaultSystemMessage,
+		UserPrompt:           defaultPromte,
+		MaxResponseTokens:    defaultMaxResponseTokens,
+		PatchIntroducePrompt: defaultPrPatchIntroducePromte,
+	}
 }
