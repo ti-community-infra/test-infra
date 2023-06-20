@@ -309,6 +309,13 @@ builds:
   - -s -w
   - -X k8s.io/test-infra/prow/version.Version={{.Env.VERSION}}
   - -X k8s.io/test-infra/prow/version.Name=cherrypicker
+- id: chatgpt
+  dir: .
+  main: prow/external-plugins/chatgpt
+  ldflags:
+  - -s -w
+  - -X k8s.io/test-infra/prow/version.Version={{.Env.VERSION}}
+  - -X k8s.io/test-infra/prow/version.Name=chatgpt  
 - id: refresh
   dir: .
   main: prow/external-plugins/refresh
