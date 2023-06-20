@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/pkoukk/tiktoken-go"
 	"github.com/sashabaranov/go-openai"
@@ -19,52 +18,6 @@ var maxTokens = map[string]int{
 	openai.GPT40314:            8192,
 	openai.GPT432K:             32768,
 	openai.GPT432K0314:         32768,
-}
-
-func splitUserMessage(messageText string, model string) []string {
-	splitLen := maxTokens[model] - splitorHoldingByteCount
-	if splitLen < 0 {
-		return nil
-	}
-
-	if len(messageText) <= splitLen {
-		return []string{messageText}
-	}
-
-	partCount := len(messageText) / splitLen
-	if partCount*splitLen < len(messageText) {
-		partCount += 1
-	}
-
-	var messages []string
-	for i := 0; i < partCount; i++ {
-		var chunkMessageLines []string
-		isLast := i == partCount-1
-
-		partFlag := fmt.Sprintf("PART %d/%d", i+1, partCount)
-		startPos := splitLen * i
-		endPos := startPos + splitLen
-		if isLast {
-			endPos = len(messageText)
-		}
-
-		if !isLast {
-			chunkMessageLines = append(chunkMessageLines,
-				fmt.Sprintf(`Do not answer yet. This is just another part of the text I want to send you. Just receive and acknowledge as "%s received" and wait for the next part.`, partFlag))
-		}
-		chunkMessageLines = append(chunkMessageLines,
-			fmt.Sprintf("[START %s]", partFlag),
-			messageText[startPos:endPos],
-			fmt.Sprintf("[END %s]", partFlag),
-		)
-		if isLast {
-			chunkMessageLines = append(chunkMessageLines, "ALL PARTS SENT. Now you can continue processing the request.")
-		}
-
-		messages = append(messages, strings.Join(chunkMessageLines, "\n"))
-	}
-
-	return messages
 }
 
 // ref: https://github.com/pkoukk/tiktoken-go#counting-tokens-for-chat-api-calls

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -59,15 +60,11 @@ type Task struct {
 type ExternalContext struct {
 	PromptTpl  string `yaml:"prompt_tpl,omitempty" json:"prompt_tpl,omitempty"`
 	ResURL     string `yaml:"res_url,omitempty" json:"res_url,omitempty"`
-	resContent []byte
+	resContent []byte //nolint: unused // to be implemented.
 }
 
 func (ec *ExternalContext) Content() ([]byte, error) {
-	if len(ec.resContent) == 0 {
-		// TODO(wuhuizuo): fetch content from `ec.ResURL` and fill `ec.resContent`, maybe we need RW lock.
-	}
-
-	return ec.resContent, nil
+	return nil, errors.New("not implemented")
 }
 
 // TaskAgent agent for fetch tasks with watching and hot reload.
