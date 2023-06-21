@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -55,6 +56,38 @@ type Task struct {
 	OutputStaticHeadNote string             `yaml:"output_static_head_note,omitempty" json:"output_static_head_note,omitempty"`
 	MaxResponseTokens    int                `yaml:"max_response_tokens,omitempty" json:"max_response_tokens,omitempty"`
 	ExternalContexts     []*ExternalContext `yaml:"external_contexts,omitempty" json:"external_contexts,omitempty"`
+
+	AlwaysRun       bool     `yaml:"always_run,omitempty" json:"always_run,omitempty"`               // automatic run or should triggered by comments.
+	SkipAuthors     []string `yaml:"skip_authors,omitempty" json:"skip_authors,omitempty"`           // skip the pull request created by the authors.
+	SkipBrancheRegs []string `yaml:"skip_branche_regs,omitempty" json:"skip_branche_regs,omitempty"` // skip the pull requests whiches target branch matched the regex.
+	SkipLabelRegs   []string `yaml:"skip_label_regs,omitempty" json:"skip_label_regs,omitempty"`     // skip the pull reqeusts when any labels matched on the pull request.
+
+	skipBrancheRegs []*regexp.Regexp `yaml:"-" json:"-"`
+	skipLabelRegs   []*regexp.Regexp `yaml:"-" json:"-"`
+}
+
+func (t *Task) initRegexps() error {
+	if len(t.SkipBrancheRegs) != 0 {
+		for _, br := range t.SkipBrancheRegs {
+			reg, err := regexp.Compile(br)
+			if err != nil {
+				return err
+			}
+			t.skipBrancheRegs = append(t.skipBrancheRegs, reg)
+		}
+	}
+
+	if len(t.SkipLabelRegs) != 0 {
+		for _, br := range t.SkipLabelRegs {
+			reg, err := regexp.Compile(br)
+			if err != nil {
+				return err
+			}
+			t.skipLabelRegs = append(t.skipLabelRegs, reg)
+		}
+	}
+
+	return nil
 }
 
 type ExternalContext struct {
@@ -75,14 +108,26 @@ type TaskAgent struct {
 // NewTaskAgent returns a new ConfigLoader.
 func NewTaskAgent(path string, watchInterval time.Duration) (*TaskAgent, error) {
 	c := &TaskAgent{ConfigAgent: ConfigAgent[TasksConfig]{path: path}}
-	err := c.Reload(path)
-	if err != nil {
+	if err := c.Reload(path); err != nil {
 		return nil, err
 	}
 
 	go c.WatchConfig(context.Background(), watchInterval, c.Reload)
 
 	return c, nil
+}
+
+func (a *TaskAgent) Reload(file string) error {
+	return a.ConfigAgent.Reload(file, func() error {
+		for _, repoCfg := range a.config {
+			for _, task := range repoCfg {
+				if err := task.initRegexps(); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
 }
 
 // Get return the config data.

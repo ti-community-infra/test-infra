@@ -19,7 +19,7 @@ type OpenaiConfig struct {
 	client *openai.Client
 }
 
-func (cfg *OpenaiConfig) initClient() {
+func (cfg *OpenaiConfig) initClient() error {
 	if cfg.client == nil {
 		openaiCfg := openai.DefaultConfig(cfg.Token)
 		openaiCfg.BaseURL = cfg.BaseURL
@@ -30,6 +30,8 @@ func (cfg *OpenaiConfig) initClient() {
 
 		cfg.client = openai.NewClientWithConfig(openaiCfg)
 	}
+
+	return nil
 }
 
 // OpenaiAgent agent for openai clients with watching and hot reload.
@@ -40,8 +42,7 @@ type OpenaiAgent struct {
 // NewOpenaiAgent returns a new openai loader.
 func NewOpenaiAgent(path string, watchInterval time.Duration) (*OpenaiAgent, error) {
 	c := &OpenaiAgent{ConfigAgent: ConfigAgent[OpenaiConfig]{path: path}}
-	err := c.Reload(path)
-	if err != nil {
+	if err := c.Reload(path); err != nil {
 		return nil, err
 	}
 
@@ -51,15 +52,7 @@ func NewOpenaiAgent(path string, watchInterval time.Duration) (*OpenaiAgent, err
 }
 
 func (a *OpenaiAgent) Reload(file string) error {
-	if err := a.ConfigAgent.Reload(file); err != nil {
-		return err
-	}
-
-	a.mu.Lock()
-	a.config.initClient()
-	a.mu.Unlock()
-
-	return nil
+	return a.ConfigAgent.Reload(file, a.config.initClient)
 }
 
 type OpenaiWrapAgent struct {
