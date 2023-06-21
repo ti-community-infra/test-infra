@@ -16,3 +16,11 @@ org2/repo2:
       - prompt_tpl: |
           This the context about context A: %s
         res_url: https://external.site/resource.html
+    skip_branch_regs:
+      - ^release-.*$
+    skip_label_regs:
+      - ^do-not-merge$
+      - ^wip$
+    skip_authors:
+      - some-bot
+      - dependabot[bot]

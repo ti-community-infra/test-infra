@@ -45,7 +45,7 @@ func (c *ConfigAgent[T]) WatchConfig(ctx context.Context, interval time.Duration
 }
 
 // Reload read and update config data.
-func (c *ConfigAgent[T]) Reload(file string) error {
+func (c *ConfigAgent[T]) Reload(file string, optionFuncs ...func() error) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return fmt.Errorf("could no load config file %s: %w", file, err)
@@ -64,6 +64,12 @@ func (c *ConfigAgent[T]) Reload(file string) error {
 		}
 	default:
 		return errors.New("only support file with `.json` or `.yaml` extension")
+	}
+
+	for _, f := range optionFuncs {
+		if err := f(); err != nil {
+			return err
+		}
 	}
 
 	return nil
