@@ -14,11 +14,11 @@ presubmits:
         - verify
         resources:
           limits:
-            cpu: 1
-            memory: 4Gi
+            cpu: "6000m"
+            memory: "6Gi"
           requests:
-            cpu: 1
-            memory: 4Gi
+            cpu: "6000m"
+            memory: "6Gi"
     annotations:
       testgrid-dashboards: sig-instrumentation-prometheus-adapter
       testgrid-tab-name: pr-verify
@@ -36,11 +36,11 @@ presubmits:
         - test
         resources:
           limits:
-            cpu: 1
-            memory: 4Gi
+            cpu: "6000m"
+            memory: "6Gi"
           requests:
-            cpu: 1
-            memory: 4Gi
+            cpu: "6000m"
+            memory: "6Gi"
     annotations:
       testgrid-dashboards: sig-instrumentation-prometheus-adapter
       testgrid-tab-name: pr-test
@@ -56,7 +56,7 @@ presubmits:
     path_alias: sigs.k8s.io/prometheus-adapter
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230613-63d85f5ed2-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230616-e730b60769-master
         command:
         # generic runner script, handles DIND, etc.
         - runner.sh
@@ -71,11 +71,11 @@ presubmits:
           privileged: true
         resources:
           limits:
-            cpu: 1
-            memory: 4Gi
+            cpu: "6000m"
+            memory: "6Gi"
           requests:
-            cpu: 1
-            memory: 4Gi
+            cpu: "6000m"
+            memory: "6Gi"
     annotations:
       testgrid-dashboards: sig-instrumentation-prometheus-adapter
       testgrid-tab-name: pr-test-e2e

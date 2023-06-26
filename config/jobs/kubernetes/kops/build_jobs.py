@@ -33,7 +33,7 @@ from helpers import ( # pylint: disable=import-error, no-name-in-module
 skip_jobs = [
 ]
 
-image = "gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230613-63d85f5ed2-master"
+image = "gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230616-e730b60769-master"
 
 loader = jinja2.FileSystemLoader(searchpath="./templates")
 
@@ -254,6 +254,7 @@ def presubmit_test(branch='master',
                    skip_report=False,
                    always_run=False,
                    scenario=None,
+                   artifacts=None,
                    env=None,
                    template_path=None,
                    use_boskos=False):
@@ -271,6 +272,13 @@ def presubmit_test(branch='master',
         kops_image = None
         kops_ssh_user = 'prow'
         kops_ssh_key_path = '/etc/ssh-key-secret/ssh-private'
+
+    boskos_resource_type = None
+    if use_boskos:
+        if cloud == 'aws':
+            boskos_resource_type = 'aws-account'
+        else:
+            raise Exception(f"use_boskos not supported on cloud {cloud}")
 
     if extra_flags is None:
         extra_flags = []
@@ -322,9 +330,10 @@ def presubmit_test(branch='master',
         always_run='true' if always_run else 'false',
         image=image,
         scenario=scenario,
+        artifacts=artifacts,
         env=env,
         template_path=template_path,
-        use_boskos=use_boskos,
+        boskos_resource_type=boskos_resource_type,
     )
 
     spec = {
@@ -391,12 +400,13 @@ k8s_versions = [
     "1.24",
     "1.25",
     "1.26",
+    "1.27",
 ]
 
 kops_versions = [
     None, # maps to latest
-    "1.25",
-    "1.26"
+    "1.26",
+    "1.27",
 ]
 
 
@@ -779,7 +789,10 @@ def generate_misc():
                    k8s_version="ci",
                    kops_channel="alpha",
                    feature_flags=['SELinuxMount'],
-                   extra_flags=["--kubernetes-feature-gates=SELinuxMountReadWriteOncePod,ReadWriteOncePod"], # pylint: disable=line-too-long
+                   extra_flags=[
+                       "--kubernetes-feature-gates=SELinuxMountReadWriteOncePod,ReadWriteOncePod",
+                       "--set=cluster.spec.containerd.selinuxEnabled=true",
+                   ],
                    focus_regex=r"\[Feature:SELinux\]",
                    # Skip:
                    # - Feature:Volumes: skips iSCSI and Ceph tests, they don't have client tools
@@ -844,7 +857,7 @@ def generate_conformance():
 # kops-periodics-distros.yaml #
 ###############################
 distros = ['debian10', 'debian11', 'debian12',
-           'ubuntu1804', 'ubuntu2004', 'ubuntu2004arm64', 'ubuntu2204', 'ubuntu2204arm64',
+           'ubuntu2004', 'ubuntu2004arm64', 'ubuntu2204', 'ubuntu2204arm64',
            'amazonlinux2', 'al2023', 'rhel8', 'rhel9', 'rocky8',
            'flatcar']
 def generate_distros():
@@ -904,13 +917,11 @@ def generate_presubmits_distros():
 #######################################
 def generate_network_plugins():
 
-    plugins = ['amazon-vpc', 'calico', 'canal', 'cilium', 'cilium-etcd', 'cilium-eni', 'flannel', 'kopeio', 'kuberouter', 'weave'] # pylint: disable=line-too-long
+    plugins = ['amazon-vpc', 'calico', 'canal', 'cilium', 'cilium-etcd', 'cilium-eni', 'flannel', 'kopeio', 'kuberouter'] # pylint: disable=line-too-long
     results = []
     for plugin in plugins:
         networking_arg = plugin.replace('amazon-vpc', 'amazonvpc').replace('kuberouter', 'kube-router') # pylint: disable=line-too-long
         k8s_version = 'stable'
-        if plugin == 'weave':
-            k8s_version = '1.22'
         distro = 'u2204'
         if plugin == 'amazon-vpc':
             distro = 'u2004'
@@ -1056,6 +1067,17 @@ def generate_presubmits_scale():
             scenario='scalability',
             networking='amazonvpc',
             always_run=False,
+        ),
+        presubmit_test(
+            name='presubmit-kops-aws-scale-amazonvpc-using-cl2',
+            scenario='scalability',
+            networking='amazonvpc',
+            always_run=False,
+            artifacts='$(ARTIFACTS)',
+            env={
+                'RUN_CL2_TEST': "true",
+                'CL2_SCHEDULER_THROUGHPUT_THRESHOLD': "25",
+            }
         )
     ]
     return results
@@ -1076,7 +1098,7 @@ def generate_versions():
             publish_version_marker='gs://kops-ci/bin/latest-ci-green.txt',
         )
     ]
-    for version in ['1.26', '1.25', '1.24', '1.23', '1.22']:
+    for version in ['1.27', '1.26', '1.25', '1.24', '1.23', '1.22']:
         results.append(
             build_test(
                 k8s_version=version,
@@ -1095,7 +1117,7 @@ def generate_versions():
 ######################
 def generate_pipeline():
     results = []
-    for version in ['master', '1.26', '1.25']:
+    for version in ['master', '1.27', '1.26']:
         branch = version if version == 'master' else f"release-{version}"
         publish_version_marker = f"gs://kops-ci/markers/{branch}/latest-ci-updown-green.txt"
         kops_version = f"https://storage.googleapis.com/k8s-staging-kops/kops/releases/markers/{branch}/latest-ci.txt" # pylint: disable=line-too-long
@@ -1128,7 +1150,6 @@ def generate_presubmits_network_plugins():
         'cilium-eni': r'^(upup\/models\/cloudup\/resources\/addons\/networking\.cilium\.io\/|pkg\/model\/(components\/containerd|firewall|components\/cilium|iam\/iam_builder)\.go|nodeup\/pkg\/model\/(context|networking\/cilium)\.go)', # pylint: disable=line-too-long
         'flannel': r'^(upup\/models\/cloudup\/resources\/addons\/networking\.flannel\/|pkg\/model\/components\/containerd\.go)', # pylint: disable=line-too-long
         'kuberouter': r'^(upup\/models\/cloudup\/resources\/addons\/networking\.kuberouter\/|pkg\/model\/components\/containerd\.go)', # pylint: disable=line-too-long
-        'weave': r'^(upup\/models\/cloudup\/resources\/addons\/networking\.weave\/)' # pylint: disable=line-too-long
     }
     supports_ipv6 = {'amazonvpc', 'calico', 'cilium'}
     results = []
@@ -1143,9 +1164,6 @@ def generate_presubmits_network_plugins():
         if plugin == 'kuberouter':
             networking_arg = 'kube-router'
             optional = True
-        if plugin == 'weave':
-            distro = 'u2204'
-            k8s_version = '1.22'
         extra_flags = ['--node-size=t3.large']
         if 'arm64' in distro:
             extra_flags = ["--node-size=t4g.large"]
@@ -1445,6 +1463,16 @@ def generate_presubmits_e2e():
 
         presubmit_test(
             distro='channels',
+            branch='release-1.27',
+            k8s_version='1.27',
+            kops_channel='alpha',
+            name='pull-kops-e2e-k8s-aws-calico-1-27',
+            networking='calico',
+            tab_name='e2e-1-27',
+            always_run=True,
+        ),
+        presubmit_test(
+            distro='channels',
             branch='release-1.26',
             k8s_version='1.26',
             kops_channel='alpha',
@@ -1585,6 +1613,11 @@ def generate_presubmits_e2e():
         presubmit_test(
             name='presubmit-kops-aws-boskos',
             scenario='aws-boskos',
+            always_run=False,
+            use_boskos=True,
+        ),
+        presubmit_test(
+            name='presubmit-kops-aws-boskos-kubetest2',
             always_run=False,
             use_boskos=True,
         ),

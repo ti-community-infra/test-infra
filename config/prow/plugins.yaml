@@ -79,6 +79,7 @@ approve:
   - kubernetes-sigs/cluster-api-provider-azure
   - kubernetes-sigs/cluster-api-provider-vsphere
   - kubernetes-sigs/descheduler
+  - kubernetes-sigs/image-builder
   require_self_approval: true
   ignore_review_state: true
 - repos:
@@ -220,6 +221,7 @@ lgtm:
   - kubernetes-sigs/downloadkubernetes
   - kubernetes-sigs/e2e-framework
   - kubernetes-sigs/etcdadm
+  - kubernetes-sigs/external-dns
   - kubernetes-sigs/promo-tools
   - kubernetes-sigs/k8s-gsm-tools
   - kubernetes-sigs/kind
@@ -470,7 +472,8 @@ milestone_applier:
   kubernetes/k8s.io:
     main: v1.28
   kubernetes/kops:
-    master: v1.27
+    master: v1.28
+    release-1.27: v1.27
     release-1.26: v1.26
     release-1.25: v1.25
     release-1.24: v1.24
@@ -851,6 +854,18 @@ require_matching_label:
     This issue is currently awaiting triage.
 
     If CAPI contributors determines this is a relevant issue, they will accept it by applying the `triage/accepted` label and provide further guidance.
+
+    The `triage/accepted` label can be added by org members by writing `/triage accepted` in a comment.
+- missing_label: needs-triage
+  org: kubernetes-sigs
+  repo: cluster-api-operator
+  issues: true
+  prs: false
+  regexp: ^triage/accepted$
+  missing_comment: |
+    This issue is currently awaiting triage.
+
+    If CAPI Operator contributors determines this is a relevant issue, they will accept it by applying the `triage/accepted` label and provide further guidance.
 
     The `triage/accepted` label can be added by org members by writing `/triage accepted` in a comment.
 - missing_label: needs-triage
@@ -1383,6 +1398,10 @@ plugins:
     - milestone
     - override
     - require-matching-label
+
+  kubernetes-sigs/cluster-api-operator:
+    plugins:
+    - require-matching-label   
 
   kubernetes-sigs/cluster-api-provider-aws:
     plugins:

@@ -1,7 +1,7 @@
 presubmits:
   kubernetes/cloud-provider-openstack:
   - name: openstack-cloud-controller-manager-e2e-test
-    cluster: eks-prow-build-cluster
+    cluster: k8s-infra-prow-build
     labels:
       preset-service-account: "true"
       preset-dind-enabled: "true"
@@ -17,7 +17,7 @@ presubmits:
       timeout: 3h
     spec:
       containers:
-        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230613-63d85f5ed2-master
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230616-e730b60769-master
           env:
           - name: "BOSKOS_HOST"
             value: "boskos.test-pods.svc.cluster.local"
@@ -53,7 +53,7 @@ presubmits:
   #     timeout: 3h
   #   spec:
   #     containers:
-  #       - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230613-63d85f5ed2-master
+  #       - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230616-e730b60769-master
   #         env:
   #         - name: "BOSKOS_HOST"
   #           value: "boskos.test-pods.svc.cluster.local"
@@ -71,7 +71,7 @@ presubmits:
   #     testgrid-tab-name: presubmit-e2e-conformance-test
 
   - name: openstack-cloud-csi-cinder-e2e-test
-    cluster: eks-prow-build-cluster
+    cluster: k8s-infra-prow-build
     labels:
       preset-service-account: "true"
       preset-dind-enabled: "true"
@@ -87,7 +87,7 @@ presubmits:
       timeout: 3h
     spec:
       containers:
-        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230613-63d85f5ed2-master
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230616-e730b60769-master
           env:
           - name: "BOSKOS_HOST"
             value: "boskos.test-pods.svc.cluster.local"
@@ -108,7 +108,7 @@ presubmits:
       testgrid-tab-name: presubmit-e2e-test
 
   - name: openstack-cloud-csi-manila-e2e-test
-    cluster: eks-prow-build-cluster
+    cluster: k8s-infra-prow-build
     labels:
       preset-service-account: "true"
       preset-dind-enabled: "true"
@@ -124,7 +124,7 @@ presubmits:
       timeout: 3h
     spec:
       containers:
-        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230613-63d85f5ed2-master
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230616-e730b60769-master
           env:
           - name: "BOSKOS_HOST"
             value: "boskos.test-pods.svc.cluster.local"
@@ -154,7 +154,7 @@ presubmits:
     path_alias: "k8s.io/cloud-provider-openstack"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230613-63d85f5ed2-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230616-e730b60769-master
         command:
         - make
         args:
@@ -181,7 +181,7 @@ presubmits:
     path_alias: "k8s.io/cloud-provider-openstack"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230613-63d85f5ed2-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230616-e730b60769-master
         command:
         - make
         args:
@@ -199,7 +199,7 @@ presubmits:
       description: Run cloud-provider-openstack csi sanity tests for manila-csi-plugin
 
   - name: openstack-cloud-keystone-authentication-authorization-test
-    cluster: eks-prow-build-cluster
+    cluster: k8s-infra-prow-build
     labels:
       preset-service-account: "true"
       preset-dind-enabled: "true"
@@ -215,7 +215,7 @@ presubmits:
       timeout: 3h
     spec:
       containers:
-        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230613-63d85f5ed2-master
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230616-e730b60769-master
           env:
           - name: "BOSKOS_HOST"
             value: "boskos.test-pods.svc.cluster.local"

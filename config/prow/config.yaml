@@ -13,10 +13,10 @@ plank:
       timeout: 2h
       grace_period: 15m
       utility_images:
-        clonerefs: "gcr.io/k8s-prow/clonerefs:v20230613-9df263832f"
-        initupload: "gcr.io/k8s-prow/initupload:v20230613-9df263832f"
-        entrypoint: "gcr.io/k8s-prow/entrypoint:v20230613-9df263832f"
-        sidecar: "gcr.io/k8s-prow/sidecar:v20230613-9df263832f"
+        clonerefs: "gcr.io/k8s-prow/clonerefs:v20230623-ea9b5f8eba"
+        initupload: "gcr.io/k8s-prow/initupload:v20230623-ea9b5f8eba"
+        entrypoint: "gcr.io/k8s-prow/entrypoint:v20230623-ea9b5f8eba"
+        sidecar: "gcr.io/k8s-prow/sidecar:v20230623-ea9b5f8eba"
       gcs_configuration:
         bucket: "kubernetes-jenkins"
         path_strategy: "legacy"
@@ -182,6 +182,7 @@ deck:
     - k8s-ovn
     - containerd-integration
     - ppc64le-kubernetes
+    - k8s-conform-s390x-k8s
 
 prowjob_namespace: default
 pod_namespace: test-pods
