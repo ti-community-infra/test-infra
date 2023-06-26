@@ -46,11 +46,21 @@ func (f FakeRepo) Filenames() ownersconfig.Filenames {
 }
 
 func (f FakeRepo) Approvers(path string) layeredsets.String {
-	return f.approversMap[path]
+	d := filepath.Dir(path)
+	if d == "." {
+		d = ""
+	}
+
+	return f.approversMap[d]
 }
 
 func (f FakeRepo) LeafApprovers(path string) sets.String {
-	return f.leafApproversMap[path]
+	d := filepath.Dir(path)
+	if d == "." {
+		d = ""
+	}
+
+	return f.leafApproversMap[d]
 }
 
 func (f FakeRepo) FindApproverOwnersForFile(path string) string {
@@ -136,45 +146,45 @@ func TestCreateFakeRepo(t *testing.T) {
 
 	tests := []struct {
 		testName              string
-		ownersFile            string
+		changedFile           string
 		expectedLeafApprovers sets.String
 		expectedApprovers     sets.String
 	}{
 		{
 			testName:              "Root Owners",
-			ownersFile:            "",
+			changedFile:           "",
 			expectedApprovers:     rootApprovers,
 			expectedLeafApprovers: rootApprovers,
 		},
 		{
 			testName:              "A Owners",
-			ownersFile:            "a",
+			changedFile:           "a/file.txt",
 			expectedLeafApprovers: aApprovers,
 			expectedApprovers:     aApprovers.Union(rootApprovers),
 		},
 		{
 			testName:              "B Owners",
-			ownersFile:            "b",
+			changedFile:           "b/file.txt",
 			expectedLeafApprovers: bApprovers,
 			expectedApprovers:     bApprovers.Union(rootApprovers),
 		},
 		{
 			testName:              "C Owners",
-			ownersFile:            "c",
+			changedFile:           "c/file.txt",
 			expectedLeafApprovers: cApprovers,
 			expectedApprovers:     cApprovers.Union(rootApprovers),
 		},
 		{
 			testName:              "Combo Owners",
-			ownersFile:            "a/combo",
+			changedFile:           "a/combo/file.txt",
 			expectedLeafApprovers: edcApprovers,
 			expectedApprovers:     edcApprovers.Union(aApprovers).Union(rootApprovers),
 		},
 	}
 
 	for _, test := range tests {
-		calculatedLeafApprovers := fakeRepo.LeafApprovers(test.ownersFile)
-		calculatedApprovers := fakeRepo.Approvers(test.ownersFile)
+		calculatedLeafApprovers := fakeRepo.LeafApprovers(test.changedFile)
+		calculatedApprovers := fakeRepo.Approvers(test.changedFile)
 
 		test.expectedLeafApprovers = setToLower(test.expectedLeafApprovers)
 		if !calculatedLeafApprovers.Equal(test.expectedLeafApprovers) {
@@ -213,25 +223,26 @@ func TestGetLeafApprovers(t *testing.T) {
 		{
 			testName:    "Single Root File PR",
 			filenames:   []string{"kubernetes.go"},
-			expectedMap: map[string]sets.String{"": setToLower(rootApprovers)},
+			expectedMap: map[string]sets.String{"kubernetes.go": setToLower(rootApprovers)},
 		},
 		{
 			testName:    "Internal Node File PR",
 			filenames:   []string{"a/test.go"},
-			expectedMap: map[string]sets.String{"a": setToLower(aApprovers)},
+			expectedMap: map[string]sets.String{"a/test.go": setToLower(aApprovers)},
 		},
 		{
 			testName:  "Two Leaf File PR",
 			filenames: []string{"a/d/test.go", "b/test.go"},
 			expectedMap: map[string]sets.String{
-				"a/d": setToLower(dApprovers),
-				"b":   setToLower(bApprovers)},
+				"a/d/test.go": setToLower(dApprovers),
+				"b/test.go":   setToLower(bApprovers)},
 		},
 		{
 			testName:  "Leaf and Parent 2 File PR",
 			filenames: []string{"a/test.go", "a/d/test.go"},
 			expectedMap: map[string]sets.String{
-				"a": setToLower(aApprovers),
+				"a/test.go":   setToLower(aApprovers),
+				"a/d/test.go": setToLower(dApprovers),
 			},
 		},
 	}
@@ -506,37 +517,37 @@ func TestFindMostCoveringApprover(t *testing.T) {
 		{
 			testName:             "Single Root File PR",
 			filenames:            []string{"kubernetes.go"},
-			unapproved:           sets.NewString(""),
+			unapproved:           sets.NewString("kubernetes.go"),
 			expectedMostCovering: setToLower(rootApprovers),
 		},
 		{
 			testName:             "Internal Node File PR",
 			filenames:            []string{"a/test.go"},
-			unapproved:           sets.NewString("a"),
+			unapproved:           sets.NewString("a/test.go"),
 			expectedMostCovering: setToLower(aApprovers),
 		},
 		{
 			testName:             "Combo and Intersecting Leaf PR",
 			filenames:            []string{"a/combo/test.go", "a/d/test.go"},
-			unapproved:           sets.NewString("a/combo", "a/d"),
+			unapproved:           sets.NewString("a/combo/test.go", "a/d/test.go"),
 			expectedMostCovering: setToLower(edcApprovers.Intersection(dApprovers)),
 		},
 		{
 			testName:             "Three Leaf PR Only B Approved",
 			filenames:            []string{"a/combo/test.go", "c/test.go", "b/test.go"},
-			unapproved:           sets.NewString("a/combo", "c/"),
+			unapproved:           sets.NewString("a/combo/test.go", "c/test.go"),
 			expectedMostCovering: setToLower(edcApprovers.Intersection(cApprovers)),
 		},
 		{
 			testName:             "Three Leaf PR Only B Left Unapproved",
 			filenames:            []string{"a/combo/test.go", "a/d/test.go", "b/test.go"},
-			unapproved:           sets.NewString("b"),
+			unapproved:           sets.NewString("b/test.go"),
 			expectedMostCovering: setToLower(bApprovers),
 		},
 		{
 			testName:             "Leaf and Parent 2 File PR",
 			filenames:            []string{"a/test.go", "a/d/test.go"},
-			unapproved:           sets.NewString("a", "a/d"),
+			unapproved:           sets.NewString("a/test.go", "a/d/test.go"),
 			expectedMostCovering: setToLower(aApprovers.Union(dApprovers)),
 		},
 	}
@@ -583,21 +594,21 @@ func TestGetReverseMap(t *testing.T) {
 			testName:  "Single Root File PR",
 			filenames: []string{"kubernetes.go"},
 			expectedRevMap: map[string]sets.String{
-				"alice": sets.NewString(""),
-				"bob":   sets.NewString(""),
+				"alice": sets.NewString("kubernetes.go"),
+				"bob":   sets.NewString("kubernetes.go"),
 			},
 		},
 		{
 			testName:  "Two Leaf PRs",
 			filenames: []string{"a/combo/test.go", "a/d/test.go"},
 			expectedRevMap: map[string]sets.String{
-				"david":  sets.NewString("a/d", "a/combo"),
-				"dan":    sets.NewString("a/d", "a/combo"),
-				"debbie": sets.NewString("a/d", "a/combo"),
-				"eve":    sets.NewString("a/combo"),
-				"erin":   sets.NewString("a/combo"),
-				"chris":  sets.NewString("a/combo"),
-				"carol":  sets.NewString("a/combo"),
+				"david":  sets.NewString("a/combo/test.go", "a/d/test.go"),
+				"dan":    sets.NewString("a/combo/test.go", "a/d/test.go"),
+				"debbie": sets.NewString("a/combo/test.go", "a/d/test.go"),
+				"eve":    sets.NewString("a/combo/test.go"),
+				"erin":   sets.NewString("a/combo/test.go"),
+				"chris":  sets.NewString("a/combo/test.go"),
+				"carol":  sets.NewString("a/combo/test.go"),
 			},
 		},
 	}

@@ -70,26 +70,24 @@ func NewOwners(log *logrus.Entry, filenames []string, r Repo, s int64) Owners {
 	return Owners{filenamesUnfiltered: filenames, filenames: filenames, repo: r, seed: s, log: log}
 }
 
-// GetApprovers returns a map from ownersFiles -> people that are approvers in them
+// GetApprovers returns a map from changed file -> people that are approvers in them
 func (o Owners) GetApprovers() map[string]sets.String {
-	ownersToApprovers := map[string]sets.String{}
-
-	for ownersFilename := range o.GetOwnersSet() {
-		ownersToApprovers[ownersFilename] = o.repo.Approvers(ownersFilename).Set()
+	changedFilesToApprovers := map[string]sets.String{}
+	for _, f := range o.filenames {
+		changedFilesToApprovers[f] = o.repo.Approvers(f).Set()
 	}
 
-	return ownersToApprovers
+	return changedFilesToApprovers
 }
 
-// GetLeafApprovers returns a map from ownersFiles -> people that are approvers in them (only the leaf)
+// GetLeafApprovers returns a map from changed file -> people that are approvers in them (only the leaf)
 func (o Owners) GetLeafApprovers() map[string]sets.String {
-	ownersToApprovers := map[string]sets.String{}
-
-	for fn := range o.GetOwnersSet() {
-		ownersToApprovers[fn] = o.repo.LeafApprovers(fn)
+	changedFilesToApprovers := map[string]sets.String{}
+	for _, f := range o.filenames {
+		changedFilesToApprovers[f] = o.repo.LeafApprovers(f)
 	}
 
-	return ownersToApprovers
+	return changedFilesToApprovers
 }
 
 // GetAllPotentialApprovers returns the people from relevant owners files needed to get the PR approved
@@ -107,7 +105,7 @@ func (o Owners) GetAllPotentialApprovers() []string {
 	return approversOnly
 }
 
-// GetReverseMap returns a map from people -> OWNERS files for which they are an approver
+// GetReverseMap returns a map from people -> changed files for which they are an approver
 func (o Owners) GetReverseMap(approvers map[string]sets.String) map[string]sets.String {
 	approverOwnersfiles := map[string]sets.String{}
 	for ownersFile, approvers := range approvers {
@@ -401,7 +399,7 @@ func (ap Approvers) GetNoIssueApproversSet() sets.String {
 func (ap Approvers) GetFilesApprovers() map[string]sets.String {
 	filesApprovers := map[string]sets.String{}
 	currentApprovers := ap.GetCurrentApproversSetCased()
-	for ownersFilename, potentialApprovers := range ap.owners.GetApprovers() {
+	for changedFilename, potentialApprovers := range ap.owners.GetApprovers() {
 		// The order of parameter matters here:
 		// - currentApprovers is the list of github handles that have approved
 		// - potentialApprovers is the list of handles in the OWNER
@@ -410,7 +408,7 @@ func (ap Approvers) GetFilesApprovers() map[string]sets.String {
 		// We want to keep the syntax of the github handle
 		// rather than the potential mis-cased username found in
 		// the OWNERS file, that's why it's the first parameter.
-		filesApprovers[ownersFilename] = CaseInsensitiveIntersection(currentApprovers, potentialApprovers)
+		filesApprovers[changedFilename] = CaseInsensitiveIntersection(currentApprovers, potentialApprovers)
 	}
 
 	return filesApprovers
@@ -449,7 +447,7 @@ func (ap Approvers) UnapprovedFiles() sets.String {
 	return unapproved
 }
 
-// GetFiles returns owners files that still need approval.
+// GetFiles returns owners files that were approved or unapproved.
 func (ap Approvers) GetFiles(baseURL *url.URL, branch string) []File {
 	var allOwnersFiles []File
 	filesApprovers := ap.GetFilesApprovers()
