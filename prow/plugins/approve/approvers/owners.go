@@ -145,7 +145,7 @@ func (o Owners) GetReverseMap(approvers map[string]sets.Set[string]) map[string]
 	return approverOwnersfiles
 }
 
-func findMostCoveringApprover(allApprovers []string, reverseMap map[string]sets.Set[string], unapproved sets.Set[string]) string {
+func findMostCoveringApprover(allApprovers []string, coveredApproversSet sets.Set[string], reverseMap map[string]sets.Set[string], unapproved sets.Set[string]) string {
 	maxCovered := 0
 	var bestPerson string
 	for _, approver := range allApprovers {
@@ -480,7 +480,6 @@ func (ap Approvers) UnapprovedFiles() sets.Set[string] {
 			unapproved.Insert(ownersFile)
 		}
 	}
-
 	return unapproved
 }
 
@@ -488,8 +487,9 @@ func (ap Approvers) UnapprovedFiles() sets.Set[string] {
 func (ap Approvers) GetFiles(baseURL *url.URL, branch string) []File {
 	var allOwnersFiles []File
 	filesApprovers := ap.GetFilesApprovers()
+	unapproverdFiles := ap.UnapprovedFiles()
 	for _, file := range sets.List(ap.owners.GetOwnersSet()) {
-		if len(filesApprovers[file]) == 0 {
+		if unapproverdFiles.Has(file) {
 			allOwnersFiles = append(allOwnersFiles, UnapprovedFile{
 				baseURL:        baseURL,
 				filepath:       file,
@@ -619,7 +619,7 @@ type UnapprovedFile struct {
 	filepath       string
 	ownersFilename string
 	// approvers is the set of users that partially approved this file change.
-	approvers sets.String
+	approvers sets.Set[string]
 	branch    string
 }
 
@@ -647,7 +647,7 @@ func (ua UnapprovedFile) String() string {
 		fullOwnersPath,
 	)
 	if ua.approvers.Len() > 0 {
-		return fmt.Sprintf("- **[%s](%s)** [%v]\n  > Need more approvers for rest parts.\n", fullOwnersPath, link, strings.Join(ua.approvers.List(), ","))
+		return fmt.Sprintf("- **[%s](%s)** [%v]\n  > Need more approvers for rest parts.\n", fullOwnersPath, link, strings.Join(sets.List(ua.approvers), ","))
 	}
 	return fmt.Sprintf("- **[%s](%s)**\n", fullOwnersPath, link)
 }
