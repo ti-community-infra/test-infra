@@ -566,7 +566,7 @@ func TestFindMostCoveringApprover(t *testing.T) {
 			seed:      TestSeed,
 			log:       logrus.WithField("plugin", "some_plugin"),
 		}
-		bestPerson := findMostCoveringApprover(testOwners.GetAllPotentialApprovers(), testOwners.GetReverseMap(testOwners.GetLeafApprovers()), test.unapproved)
+		bestPerson := findMostCoveringApprover(testOwners.GetAllPotentialApprovers(), nil, testOwners.GetReverseMap(testOwners.GetLeafApprovers()), test.unapproved)
 		if test.expectedMostCovering.Intersection(sets.NewString(bestPerson)).Len() != 1 {
 			t.Errorf("Failed for test %v.  Didn't correct approvers list.  Expected: %v. Found %v", test.testName, test.expectedMostCovering, bestPerson)
 		}
