@@ -177,8 +177,8 @@ func TestGetFiles(t *testing.T) {
 			filenames:         []string{"a/combo/test.go", "a/d/test.go"},
 			currentlyApproved: sets.New[string](),
 			expectedFiles: []File{
-				UnapprovedFile{&url.URL{Scheme: "https", Host: "github.com", Path: "org/repo"}, "a/combo", ownersconfig.DefaultOwnersFile, "master"},
-				UnapprovedFile{&url.URL{Scheme: "https", Host: "github.com", Path: "org/repo"}, "a/d", ownersconfig.DefaultOwnersFile, "master"},
+				UnapprovedFile{&url.URL{Scheme: "https", Host: "github.com", Path: "org/repo"}, "a/combo", ownersconfig.DefaultOwnersFile, nil, "master"},
+				UnapprovedFile{&url.URL{Scheme: "https", Host: "github.com", Path: "org/repo"}, "a/d", ownersconfig.DefaultOwnersFile, nil, "master"},
 			},
 		},
 		{
@@ -187,7 +187,7 @@ func TestGetFiles(t *testing.T) {
 			currentlyApproved: eApprovers,
 			expectedFiles: []File{
 				ApprovedFile{&url.URL{Scheme: "https", Host: "github.com", Path: "org/repo"}, "a/combo", ownersconfig.DefaultOwnersFile, eApprovers, "master"},
-				UnapprovedFile{&url.URL{Scheme: "https", Host: "github.com", Path: "org/repo"}, "a/d", ownersconfig.DefaultOwnersFile, "master"},
+				UnapprovedFile{&url.URL{Scheme: "https", Host: "github.com", Path: "org/repo"}, "a/d", ownersconfig.DefaultOwnersFile, nil, "master"},
 			},
 		},
 		{
@@ -205,7 +205,7 @@ func TestGetFiles(t *testing.T) {
 			currentlyApproved: cApprovers,
 			expectedFiles: []File{
 				ApprovedFile{&url.URL{Scheme: "https", Host: "github.com", Path: "org/repo"}, "a/combo", ownersconfig.DefaultOwnersFile, cApprovers, "master"},
-				UnapprovedFile{&url.URL{Scheme: "https", Host: "github.com", Path: "org/repo"}, "a/d", ownersconfig.DefaultOwnersFile, "master"},
+				UnapprovedFile{&url.URL{Scheme: "https", Host: "github.com", Path: "org/repo"}, "a/d", ownersconfig.DefaultOwnersFile, nil, "master"},
 				ApprovedFile{&url.URL{Scheme: "https", Host: "github.com", Path: "org/repo"}, "c", ownersconfig.DefaultOwnersFile, cApprovers, "master"},
 			},
 		},

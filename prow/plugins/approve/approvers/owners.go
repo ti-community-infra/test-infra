@@ -74,8 +74,11 @@ func NewOwners(log *logrus.Entry, filenames []string, r Repo, s int64) Owners {
 func (o Owners) GetApprovers() map[string]sets.Set[string] {
 	ownersToApprovers := map[string]sets.Set[string]{}
 
-	for ownersFilename := range o.GetOwnersSet() {
-		ownersToApprovers[ownersFilename] = o.repo.Approvers(ownersFilename).Set()
+	owners := o.GetOwnersSet()
+	for k := range ownersToApprovers {
+		if !owners.Has(k) {
+			delete(ownersToApprovers, k)
+		}
 	}
 
 	return ownersToApprovers
@@ -85,8 +88,20 @@ func (o Owners) GetApprovers() map[string]sets.Set[string] {
 func (o Owners) GetLeafApprovers() map[string]sets.Set[string] {
 	ownersToApprovers := map[string]sets.Set[string]{}
 
-	for fn := range o.GetOwnersSet() {
-		ownersToApprovers[fn] = o.repo.LeafApprovers(fn)
+	for _, toApprove := range o.filenames {
+		ownersFile := o.repo.FindApproverOwnersForFile(toApprove)
+		approvers := o.repo.LeafApprovers(toApprove)
+		if _, ok := ownersToApprovers[ownersFile]; !ok {
+			ownersToApprovers[ownersFile] = sets.NewString()
+		}
+		ownersToApprovers[ownersFile] = ownersToApprovers[ownersFile].Union(approvers)
+	}
+
+	owners := o.GetOwnersSet()
+	for k := range ownersToApprovers {
+		if !owners.Has(k) {
+			delete(ownersToApprovers, k)
+		}
 	}
 
 	return ownersToApprovers
@@ -127,11 +142,14 @@ func findMostCoveringApprover(allApprovers []string, reverseMap map[string]sets.
 	var bestPerson string
 	for _, approver := range allApprovers {
 		filesCanApprove := reverseMap[approver]
-		if filesCanApprove.Intersection(unapproved).Len() > maxCovered {
+		if filesCanApprove.Intersection(unapproved).Len() > maxCovered && !coveredApproversSet.Has(approver) {
 			maxCovered = len(filesCanApprove)
 			bestPerson = approver
 		}
 	}
+
+	// todo: make it better.
+
 	return bestPerson
 }
 
@@ -169,7 +187,7 @@ func (o Owners) KeepCoveringApprovers(reverseMap map[string]sets.Set[string], kn
 func (o Owners) GetSuggestedApprovers(reverseMap map[string]sets.Set[string], potentialApprovers []string) sets.Set[string] {
 	ap := NewApprovers(o)
 	for !ap.RequirementsMet() {
-		newApprover := findMostCoveringApprover(potentialApprovers, reverseMap, ap.UnapprovedFiles())
+		newApprover := findMostCoveringApprover(potentialApprovers, ap.GetCurrentApproversSet(), reverseMap, ap.UnapprovedFiles())
 		if newApprover == "" {
 			o.log.Debugf("Couldn't find/suggest approvers for each files. Unapproved: %q", sets.List(ap.UnapprovedFiles()))
 			return ap.GetCurrentApproversSet()
@@ -459,6 +477,7 @@ func (ap Approvers) GetFiles(baseURL *url.URL, branch string) []File {
 				baseURL:        baseURL,
 				filepath:       file,
 				ownersFilename: ap.owners.repo.Filenames().Owners,
+				approvers:      filesApprovers[file],
 				branch:         branch,
 			})
 		} else {
@@ -582,7 +601,9 @@ type UnapprovedFile struct {
 	baseURL        *url.URL
 	filepath       string
 	ownersFilename string
-	branch         string
+	// approvers is the set of users that partially approved this file change.
+	approvers sets.String
+	branch    string
 }
 
 func (a ApprovedFile) String() string {
@@ -608,6 +629,9 @@ func (ua UnapprovedFile) String() string {
 		ua.branch,
 		fullOwnersPath,
 	)
+	if ua.approvers.Len() > 0 {
+		return fmt.Sprintf("- **[%s](%s)** [%v]\n  > Need more approvers for rest parts.\n", fullOwnersPath, link, strings.Join(ua.approvers.List(), ","))
+	}
 	return fmt.Sprintf("- **[%s](%s)**\n", fullOwnersPath, link)
 }
 
