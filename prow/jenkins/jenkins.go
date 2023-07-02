@@ -96,6 +96,7 @@ type Build struct {
 	} `json:"task"`
 	Number   int     `json:"number"`
 	Result   *string `json:"result"`
+	Building bool    `json:"building"`
 	enqueued bool
 }
 
@@ -123,12 +124,12 @@ type JobInfo struct {
 
 // IsRunning means the job started but has not finished.
 func (jb *Build) IsRunning() bool {
-	return jb.Result == nil
+	return jb.Result == nil || jb.Building
 }
 
 // IsSuccess means the job passed
 func (jb *Build) IsSuccess() bool {
-	return jb.Result != nil && *jb.Result == success
+	return !jb.Building && jb.Result != nil && *jb.Result == success
 }
 
 // IsFailure means the job completed with problems.
@@ -722,7 +723,7 @@ func (c *Client) GetEnqueuedBuilds(jobs []BuildQueryParams) (map[string]Build, e
 func (c *Client) GetBuilds(job string) (map[string]Build, error) {
 	c.logger.Debugf("GetBuilds(%v)", job)
 
-	data, err := c.Get(fmt.Sprintf("/job/%s/api/json?tree=builds[number,result,actions[parameters[name,value]]]", job))
+	data, err := c.Get(fmt.Sprintf("/job/%s/api/json?tree=builds[number,result,building,actions[parameters[name,value]]]", job))
 	if err != nil {
 		// Ignore 404s so we will not block processing the rest of the jobs.
 		if _, isNotFound := err.(NotFoundError); isNotFound {
