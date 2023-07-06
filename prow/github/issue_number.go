@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	issueNumberBlockRegexpTemplate  = "(?i)%s?\\s*%s(?P<issue_number>[1-9]\\d*)"
+	issueNumberBlockRegexpTemplate  = "(?i)%s\\s+%s(?P<issue_number>[1-9]\\d*)"
 	associatePrefixRegexp           = "(?P<associate_prefix>ref|close[sd]?|resolve[sd]?|fix(e[sd])?)"
 	orgRegexp                       = "[a-zA-Z0-9][a-zA-Z0-9-]{0,38}"
 	repoRegexp                      = "[a-zA-Z0-9-_]{1,100}"
