@@ -315,6 +315,9 @@ func handle(wantLGTM bool, config *plugins.Configuration, ownersClient repoowner
 			return err
 		}
 		if !loadReviewers(ro, filenames).Has(github.NormLogin(author)) {
+			log.Warnf("All approvers: %v", ro.AllApprovers().List())
+			log.Warnf("All reviewers: %v", ro.AllReviewers().List())
+			log.Warnf("Reviewers: %v", loadReviewers(ro, filenames).Set().List())
 			resp := "adding LGTM is restricted to approvers and reviewers in OWNERS files."
 			log.Infof("Reply to /lgtm request with comment: \"%s\"", resp)
 			return gc.CreateComment(org, repoName, number, plugins.FormatResponseRaw(body, htmlURL, author, resp))
