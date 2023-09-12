@@ -972,6 +972,69 @@ var (
 	txtFileReg = regexp.MustCompile(`.*\.txt`)
 )
 
+func TestGetReviewers(t *testing.T) {
+	tests := []struct {
+		name               string
+		ro                 *RepoOwners
+		filePath           string
+		expectedOwnersPath string
+		expectedLeafOwners sets.Set[string]
+		expectedAllOwners  sets.Set[string]
+	}{
+		{
+			name: "should inherit parent reviewers when no reviewers set",
+			ro: &RepoOwners{
+				reviewers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"": regexpAll("alice", "bob"),
+				},
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"l": regexpAll("lily"),
+				},
+				options: map[string]dirOptions{
+					"l": {NoParentOwners: true},
+				},
+			},
+			filePath:           "l/hello.txt",
+			expectedOwnersPath: "",
+			expectedLeafOwners: sets.New[string]("alice", "bob"),
+			expectedAllOwners:  sets.New[string]("alice", "bob"),
+		},
+		{
+			name: "should not inherit parent reviewers when reviewers set",
+			ro: &RepoOwners{
+				reviewers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"":  regexpAll("alice", "bob"),
+					"l": regexpAll("lily"),
+				},
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"l": regexpAll("lily"),
+				},
+				options: map[string]dirOptions{
+					"l": {NoParentOwners: true},
+				},
+			},
+			filePath:           "l/hello.txt",
+			expectedOwnersPath: "l",
+			expectedLeafOwners: sets.New[string]("lily"),
+			expectedAllOwners:  sets.New[string]("lily"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.ro.LeafReviewers(tt.filePath); !got.Equal(tt.expectedLeafOwners) {
+				t.Errorf("LeafReviewers() = %v, want %v", got, tt.expectedLeafOwners)
+			}
+			if got := tt.ro.Reviewers(tt.filePath).Set(); !got.Equal(tt.expectedAllOwners) {
+				t.Errorf("Reviewers() = %v, want %v", got, tt.expectedAllOwners)
+			}
+			if got := tt.ro.FindReviewersOwnersForFile(tt.filePath); got != tt.expectedOwnersPath {
+				t.Errorf("FindReviewersOwnersForFile() = %v, want %v", got, tt.expectedOwnersPath)
+			}
+		})
+	}
+}
+
 func TestGetApprovers(t *testing.T) {
 	ro := &RepoOwners{
 		approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
