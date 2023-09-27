@@ -797,7 +797,19 @@ func (o *RepoOwners) FindReviewersOwnersForFile(path string) string {
 // FindLabelsForFile returns a set of labels which should be applied to PRs
 // modifying files under the given path.
 func (o *RepoOwners) FindLabelsForFile(path string) sets.Set[string] {
-	return o.entriesForFile(path, o.labels, false).Set()
+	labels := make(map[string]map[*regexp.Regexp]sets.Set[string])
+	for p, c := range o.labels {
+		clonedMap := make(map[*regexp.Regexp]sets.Set[string])
+		for re, labelSet := range c {
+			if re == nil {
+				re = regexp.MustCompile(".*")
+			}
+			clonedMap[re] = labelSet.Clone()
+		}
+		labels[p] = clonedMap
+	}
+
+	return o.entriesForFile(path, labels, false).Set()
 }
 
 // IsNoParentOwners checks if an OWNERS file path refers to an OWNERS file with NoParentOwners enabled.
@@ -828,11 +840,21 @@ func (o *RepoOwners) entriesForFile(path string, people map[string]map[*regexp.R
 			o.log.WithError(err).WithField("path", path).Errorf("Unable to find relative path between %q and path.", d)
 			return nil
 		}
+
+		layerSet := sets.New[string]()
 		for re, s := range people[d] {
-			if re == nil || re.MatchString(relative) {
-				out.Insert(layerID, sets.List(s)...)
+			if re != nil && re.MatchString(relative) {
+				layerSet.Insert(sets.List(s)...)
 			}
 		}
+		// lazy match for default regex path.
+		if layerSet.Len() == 0 {
+			if s, ok := people[d][nil]; ok {
+				layerSet.Insert(sets.List(s)...)
+			}
+		}
+		out.Insert(layerID, sets.List(layerSet)...)
+
 		if leafOnly && out.Len() > 0 {
 			break
 		}
