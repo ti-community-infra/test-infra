@@ -296,7 +296,7 @@ func TestSetApproveDefaults(t *testing.T) {
 			org:                     "kubernetes",
 			repo:                    "kubernetes",
 			expectedCommandHelpLink: "https://go.k8s.io/bot-commands",
-			expectedPrProcessLink:   "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process",
+			expectedPrProcessLink:   "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process",
 		},
 		{
 			name:                    "overwrite",
@@ -310,7 +310,7 @@ func TestSetApproveDefaults(t *testing.T) {
 			org:                     "kubernetes",
 			repo:                    "website",
 			expectedCommandHelpLink: "https://go.k8s.io/bot-commands",
-			expectedPrProcessLink:   "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process",
+			expectedPrProcessLink:   "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process",
 		},
 	}
 

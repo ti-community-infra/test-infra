@@ -328,7 +328,7 @@ type Approve struct {
 	// and available under https://<deck-url>/command-help, e.g. "https://prow.k8s.io/command-help"
 	CommandHelpLink string `json:"commandHelpLink"`
 	// PrProcessLink is the link to the help page which explains the code review process.
-	// The default value is "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process".
+	// The default value is "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process".
 	PrProcessLink string `json:"pr_process_link,omitempty"`
 }
 
@@ -855,7 +855,7 @@ func (c *Configuration) ApproveFor(org, repo string) *Approve {
 		a.CommandHelpLink = "https://go.k8s.io/bot-commands"
 	}
 	if a.PrProcessLink == "" {
-		a.PrProcessLink = "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process"
+		a.PrProcessLink = "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process"
 	}
 	return a
 }

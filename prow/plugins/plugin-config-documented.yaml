@@ -15,7 +15,7 @@ approve:
       # indicate approval
       lgtm_acts_as_approve: true
       # PrProcessLink is the link to the help page which explains the code review process.
-      # The default value is "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process".
+      # The default value is "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process".
       pr_process_link: ' '
       # Repos is either of the form org/repos or just org.
       repos:
