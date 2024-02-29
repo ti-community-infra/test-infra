@@ -54,6 +54,7 @@ import (
 	"k8s.io/test-infra/prow/pod-utils/downwardapi"
 )
 
+// add new line to test config unit tests
 func pStr(str string) *string {
 	return &str
 }
