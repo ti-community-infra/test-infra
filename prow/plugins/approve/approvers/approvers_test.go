@@ -797,7 +797,7 @@ func TestGetMessage(t *testing.T) {
 	want := `[APPROVALNOTIFIER] This PR is **NOT APPROVED**
 
 This pull-request has been approved by: *<a href="REFERENCE" title="Approved">Bill</a>*
-**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice) for approval. For more information see [the Kubernetes Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
+**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice) for approval. For more information see [the TiDB Code Review Process](https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process).
 
 *No associated issue*. Update pull-request body to add a reference to an issue, or get approval with ` + "`/approve no-issue`" + `
 
@@ -813,7 +813,7 @@ Approvers can indicate their approval by writing ` + "`/approve`" + ` in a comme
 Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a comment
 </details>
 <!-- META={"approvers":["alice"]} -->`
-	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process", "org", "repo", "dev"); got == nil {
+	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process", "org", "repo", "dev"); got == nil {
 		t.Error("GetMessage() failed")
 	} else if *got != want {
 		t.Errorf("GetMessage() = %+v, want = %+v", *got, want)
@@ -836,7 +836,7 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 	want = `[APPROVALNOTIFIER] This PR is **NOT APPROVED**
 
 This pull-request has been approved by: *<a href="REFERENCE" title="Approved">Bill</a>*
-**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [bob](https://github.com/bob) for approval. For more information see [the Kubernetes Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
+**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [bob](https://github.com/bob) for approval. For more information see [the TiDB Code Review Process](https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process).
 
 *No associated issue*. Update pull-request body to add a reference to an issue, or get approval with ` + "`/approve no-issue`" + `
 
@@ -853,7 +853,7 @@ Approvers can indicate their approval by writing ` + "`/approve`" + ` in a comme
 Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a comment
 </details>
 <!-- META={"approvers":["alice","bob"]} -->`
-	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process", "org", "repo", "dev"); got == nil {
+	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process", "org", "repo", "dev"); got == nil {
 		t.Error("GetMessage() failed")
 	} else if *got != want {
 		t.Errorf("GetMessage() = %+v, want = %+v", *got, want)
@@ -883,7 +883,7 @@ This pull-request has been approved by: *<a href="REFERENCE" title="Approved">Al
 
 The full list of commands accepted by this bot can be found [here](https://go.k8s.io/bot-commands?repo=org%2Frepo).
 
-The pull request process is described [here](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process)
+The pull request process is described [here](https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process)
 
 <details >
 Needs approval from an approver in each of these files:
@@ -895,7 +895,7 @@ Approvers can indicate their approval by writing ` + "`/approve`" + ` in a comme
 Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a comment
 </details>
 <!-- META={"approvers":[]} -->`
-	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process", "org", "repo", "master"); got == nil {
+	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process", "org", "repo", "master"); got == nil {
 		t.Error("GetMessage() failed")
 	} else if *got != want {
 		t.Errorf("GetMessage() = %+v, want = %+v", *got, want)
@@ -918,7 +918,7 @@ func TestGetMessageNoneApproved(t *testing.T) {
 	want := `[APPROVALNOTIFIER] This PR is **NOT APPROVED**
 
 This pull-request has been approved by: *<a href="REFERENCE" title="Author self-approved">John</a>*
-**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [bill](https://github.com/bill) for approval. For more information see [the Kubernetes Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
+**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [bill](https://github.com/bill) for approval. For more information see [the TiDB Code Review Process](https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process).
 
 *No associated issue*. Update pull-request body to add a reference to an issue, or get approval with ` + "`/approve no-issue`" + `
 
@@ -934,7 +934,7 @@ Approvers can indicate their approval by writing ` + "`/approve`" + ` in a comme
 Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a comment
 </details>
 <!-- META={"approvers":["alice","bill"]} -->`
-	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process", "org", "repo", "master"); got == nil {
+	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process", "org", "repo", "master"); got == nil {
 		t.Error("GetMessage() failed")
 	} else if *got != want {
 		t.Errorf("GetMessage() = %+v, want = %+v", *got, want)
@@ -966,7 +966,7 @@ Associated issue: *#12345*
 
 The full list of commands accepted by this bot can be found [here](https://go.k8s.io/bot-commands?repo=org%2Frepo).
 
-The pull request process is described [here](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process)
+The pull request process is described [here](https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process)
 
 <details >
 Needs approval from an approver in each of these files:
@@ -978,7 +978,7 @@ Approvers can indicate their approval by writing ` + "`/approve`" + ` in a comme
 Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a comment
 </details>
 <!-- META={"approvers":[]} -->`
-	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process", "org", "repo", "master"); got == nil {
+	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process", "org", "repo", "master"); got == nil {
 		t.Error("GetMessage() failed")
 	} else if *got != want {
 		t.Errorf("GetMessage() = %+v, want = %+v", *got, want)
@@ -1009,7 +1009,7 @@ Associated issue requirement bypassed by: *<a href="REFERENCE" title="Approved">
 
 The full list of commands accepted by this bot can be found [here](https://go.k8s.io/bot-commands?repo=org%2Frepo).
 
-The pull request process is described [here](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process)
+The pull request process is described [here](https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process)
 
 <details >
 Needs approval from an approver in each of these files:
@@ -1021,7 +1021,7 @@ Approvers can indicate their approval by writing ` + "`/approve`" + ` in a comme
 Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a comment
 </details>
 <!-- META={"approvers":[]} -->`
-	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process", "org", "repo", "master"); got == nil {
+	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process", "org", "repo", "master"); got == nil {
 		t.Error("GetMessage() failed")
 	} else if *got != want {
 		t.Errorf("GetMessage() = %+v, want = %+v", *got, want)
@@ -1045,7 +1045,7 @@ func TestGetMessageMDOwners(t *testing.T) {
 	want := `[APPROVALNOTIFIER] This PR is **NOT APPROVED**
 
 This pull-request has been approved by: *<a href="REFERENCE" title="Author self-approved">John</a>*
-**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [doctor](https://github.com/doctor) for approval. For more information see [the Kubernetes Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
+**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [doctor](https://github.com/doctor) for approval. For more information see [the TiDB Code Review Process](https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process).
 
 *No associated issue*. Update pull-request body to add a reference to an issue, or get approval with ` + "`/approve no-issue`" + `
 
@@ -1061,7 +1061,7 @@ Approvers can indicate their approval by writing ` + "`/approve`" + ` in a comme
 Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a comment
 </details>
 <!-- META={"approvers":["alice","doctor"]} -->`
-	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process", "org", "repo", "master"); got == nil {
+	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.com"}, "https://go.k8s.io/bot-commands", "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process", "org", "repo", "master"); got == nil {
 		t.Error("GetMessage() failed")
 	} else if *got != want {
 		t.Errorf("GetMessage() = %+v, want = %+v", *got, want)
@@ -1085,7 +1085,7 @@ func TestGetMessageDifferentGitHubLink(t *testing.T) {
 	want := `[APPROVALNOTIFIER] This PR is **NOT APPROVED**
 
 This pull-request has been approved by: *<a href="REFERENCE" title="Author self-approved">John</a>*
-**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [doctor](https://github.com/doctor) for approval. For more information see [the Kubernetes Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
+**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [doctor](https://github.com/doctor) for approval. For more information see [the TiDB Code Review Process](https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process).
 
 *No associated issue*. Update pull-request body to add a reference to an issue, or get approval with ` + "`/approve no-issue`" + `
 
@@ -1101,7 +1101,7 @@ Approvers can indicate their approval by writing ` + "`/approve`" + ` in a comme
 Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a comment
 </details>
 <!-- META={"approvers":["alice","doctor"]} -->`
-	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.mycorp.com"}, "https://go.k8s.io/bot-commands", "https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process", "org", "repo", "master"); got == nil {
+	if got := GetMessage(ap, &url.URL{Scheme: "https", Host: "github.mycorp.com"}, "https://go.k8s.io/bot-commands", "https://book.prow.tidb.net/#/en/workflows/pr?id=main-pr-collaboration-process", "org", "repo", "master"); got == nil {
 		t.Error("GetMessage() failed")
 	} else if *got != want {
 		t.Errorf("GetMessage() = %+v, want = %+v", *got, want)
