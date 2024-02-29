@@ -17,8 +17,10 @@ limitations under the License.
 package approvers
 
 import (
+	"fmt"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -859,6 +861,118 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 		t.Errorf("GetMessage() = %+v, want = %+v", *got, want)
 	}
 }
+
+
+
+func TestGetMessageMDSuggestedCCAssignedCC(t *testing.T) {
+	linkURL, _ := url.Parse("https://github.com")
+	commandHelpLink := "https://commandHelpLink"
+	prProcessLink := "https://prProcessLink"
+	org := "org"
+	repo := "repo"
+	branch := "branch"
+
+	ap := NewApprovers(
+		Owners{
+			filenames: []string{"a/a.go", "b/b.go", "c/c.go", "d/d.go"},
+			repo: createFakeRepo(map[string]sets.Set[string]{
+				"a": sets.New[string]("Alice"),
+				"b": sets.New[string]("Bill"),
+				"c": sets.New[string]("Cathy"),
+				"d": sets.New[string]("Diana"),
+			}),
+			log: logrus.WithField("plugin", "some_plugin"),
+		},
+	)
+
+	ap.RequireIssue = true
+	// ap.AddApprover("Bill", "REFERENCE", false)
+	ap.AddAssignees("Cathy")
+	ap.AddAssignees("Diana")
+	
+	fmt.Println(len(ap.SuggestedCCs()))
+	fmt.Println(len(ap.AssignedCCs()))
+
+	expectedOutput := "**Once this PR has been reviewed and has the lgtm label**, please ask for approval from [cathy](https://github.com/cathy), [diana](https://github.com/diana) and additionally assign [alice](https://github.com/alice), [bill](https://github.com/bill) for approval(**Please ensuring that each of them provides their approval before proceeding**)."
+
+	got := GetMessage(ap, linkURL, commandHelpLink, prProcessLink, org, repo, branch)
+	if got != nil && !strings.Contains(*got, expectedOutput) {
+		t.Errorf("GetMessage() = %v, want %v", *got, expectedOutput)
+	}
+
+}
+
+func TestGetMessageMDSuggestedCCNoAssignedCC(t *testing.T) {
+	linkURL, _ := url.Parse("https://github.com")
+	commandHelpLink := "https://commandHelpLink"
+	prProcessLink := "https://prProcessLink"
+	org := "org"
+	repo := "repo"
+	branch := "branch"
+
+	ap := NewApprovers(
+		Owners{
+			filenames: []string{"a/a.go", "b/b.go", "c/c.go", "d/d.go"},
+			repo: createFakeRepo(map[string]sets.Set[string]{
+				"a": sets.New[string]("Alice"),
+				"b": sets.New[string]("Bill"),
+				"c": sets.New[string]("Cathy"),
+				"d": sets.New[string]("Diana"),
+			}),
+			log: logrus.WithField("plugin", "some_plugin"),
+		},
+	)
+
+	ap.RequireIssue = true
+	ap.AddApprover("Bill", "REFERENCE", false)
+
+
+	expectedOutput := "**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [cathy](https://github.com/cathy), [diana](https://github.com/diana) for approval, **ensuring that each of them provides their approval before proceeding**."
+
+	got := GetMessage(ap, linkURL, commandHelpLink, prProcessLink, org, repo, branch)
+	if got != nil && !strings.Contains(*got, expectedOutput) {
+		t.Errorf("GetMessage() = %v, want %v", *got, expectedOutput)
+	}
+
+}
+
+func TestGetMessageNoSuggestedCCMDAssignedCC(t *testing.T) {
+	linkURL, _ := url.Parse("https://github.com")
+	commandHelpLink := "https://commandHelpLink"
+	prProcessLink := "https://prProcessLink"
+	org := "org"
+	repo := "repo"
+	branch := "branch"
+
+	ap := NewApprovers(
+		Owners{
+			filenames: []string{"a/a.go", "b/b.go", "c/c.go", "d/d.go"},
+			repo: createFakeRepo(map[string]sets.Set[string]{
+				"a": sets.New[string]("Alice"),
+				"b": sets.New[string]("Bill"),
+				"c": sets.New[string]("Cathy"),
+				"d": sets.New[string]("Diana"),
+			}),
+			log: logrus.WithField("plugin", "some_plugin"),
+		},
+	)
+
+	ap.RequireIssue = true
+	ap.AddApprover("Bill", "REFERENCE", false)
+	ap.AddAssignees("Alice")
+	ap.AddAssignees("Cathy")
+	ap.AddAssignees("Diana")
+
+
+	expectedOutput := "**Once this PR has been reviewed and has the lgtm label**, please ask for approval from [alice](https://github.com/alice), [cathy](https://github.com/cathy), [diana](https://github.com/diana), **ensuring that each of them provides their approval before proceeding**."
+
+	got := GetMessage(ap, linkURL, commandHelpLink, prProcessLink, org, repo, branch)
+	if got != nil && !strings.Contains(*got, expectedOutput) {
+		t.Errorf("GetMessage() = %v, want %v", *got, expectedOutput)
+	}
+
+}
+
 
 func TestGetMessageAllApproved(t *testing.T) {
 	ap := NewApprovers(
