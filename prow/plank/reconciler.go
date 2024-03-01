@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/semaphore"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	authorizationv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/utils/clock"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,6 +48,7 @@ import (
 	prowv1 "k8s.io/test-infra/prow/apis/prowjobs/v1"
 	"k8s.io/test-infra/prow/config"
 	kubernetesreporterapi "k8s.io/test-infra/prow/crier/reporters/gcs/kubernetes/api"
+	"k8s.io/test-infra/prow/flagutil"
 	"k8s.io/test-infra/prow/io"
 	"k8s.io/test-infra/prow/io/providers"
 	"k8s.io/test-infra/prow/kube"
@@ -69,10 +71,33 @@ const (
 	NodeUnreachablePodReason = "NodeLost"
 )
 
+// RequiredTestPodVerbs returns a list of verbs that we expect to be able to
+// have permissions for when interacting with the test pods. This is used during
+// startup to check that we have the necessary authorizations on build clusters.
+//
+// NOTE: Setting up build cluster managers is tricky because if we don't
+// have the required permissions, the controller manager setup machinery
+// (library code, not our code) can return an error and this can essentially
+// result in a fatal error, resulting in a crash loop on startup. Although
+// other components such as crier, deck, and hook also need to talk to build
+// clusters, we only perform this preemptive requiredTestPodVerbs check for
+// PCM and sinker because only these latter components make use of the
+// BuildClusterManagers() call.
+func RequiredTestPodVerbs() []string {
+	return []string{
+		"create",
+		"delete",
+		"list",
+		"watch",
+		"get",
+		"patch",
+	}
+}
+
 func Add(
 	mgr controllerruntime.Manager,
 	buildMgrs map[string]controllerruntime.Manager,
-	knownClusters sets.Set[string],
+	knownClusters map[string]rest.Config,
 	cfg config.Getter,
 	opener io.Opener,
 	totURL string,
@@ -84,7 +109,7 @@ func Add(
 func add(
 	mgr controllerruntime.Manager,
 	buildMgrs map[string]controllerruntime.Manager,
-	knownClusters sets.Set[string],
+	knownClusters map[string]rest.Config,
 	cfg config.Getter,
 	opener io.Opener,
 	totURL string,
@@ -118,7 +143,16 @@ func add(
 		blder = blder.Watches(
 			source.NewKindWithCache(&corev1.Pod{}, buildClusterMgr.GetCache()),
 			podEventRequestMapper(cfg().ProwJobNamespace))
-		r.buildClients[buildCluster] = buildClusterMgr.GetClient()
+		bc := buildClient{
+			Client: buildClusterMgr.GetClient()}
+		if restConfig, ok := knownClusters[buildCluster]; ok {
+			authzClient, err := authorizationv1.NewForConfig(&restConfig)
+			if err != nil {
+				return fmt.Errorf("failed to construct authz client: %s", err)
+			}
+			bc.ssar = authzClient.SelfSubjectAccessReviews()
+		}
+		r.buildClients[buildCluster] = bc
 	}
 
 	if err := blder.Complete(r); err != nil {
@@ -139,42 +173,67 @@ func add(
 func newReconciler(ctx context.Context, pjClient ctrlruntimeclient.Client, overwriteReconcile reconcile.Func, cfg config.Getter, opener io.Opener, totURL string) *reconciler {
 	return &reconciler{
 		pjClient:           pjClient,
-		buildClients:       map[string]ctrlruntimeclient.Client{},
+		buildClients:       map[string]buildClient{},
 		overwriteReconcile: overwriteReconcile,
 		log:                logrus.NewEntry(logrus.StandardLogger()).WithField("controller", ControllerName),
 		config:             cfg,
 		opener:             opener,
 		totURL:             totURL,
 		clock:              clock.RealClock{},
-		serializationLocks: &shardedLock{
+		maxConcurrencySerializationLocks: &shardedLock{
 			mapLock: &sync.Mutex{},
-			locks:   map[string]*semaphore.Weighted{},
+			locks:   map[string]*sync.Mutex{},
+		},
+		jobQueueSerializationLocks: &shardedLock{
+			mapLock: &sync.Mutex{},
+			locks:   map[string]*sync.Mutex{},
 		},
 	}
 }
 
 type reconciler struct {
 	pjClient           ctrlruntimeclient.Client
-	buildClients       map[string]ctrlruntimeclient.Client
+	buildClients       map[string]buildClient
 	overwriteReconcile reconcile.Func
 	log                *logrus.Entry
 	config             config.Getter
 	opener             io.Opener
 	totURL             string
 	clock              clock.WithTickerAndDelayedExecution
-	serializationLocks *shardedLock
+	/* maxConcurrencySerializationLocks and jobQueueSerializationLocks are used to serialize
+	   reconciliation of ProwJobs that have concurrency limits that might affect eachother.
+
+	   The concurrency management strategy has 3 basic parts. Each part is skipped if the ProwJob
+	   does not specify a MaxConcurrency or JobQueueName.
+
+	   1. Serialize per the job and/or queue name as needed using these locks. This prevents
+	      concurrent reconciliation threads from triggering jobs beyond the concurrency limit.
+	   2. Compare against the ProwJob index to see how many jobs there are for the job and job queue
+	      and only trigger the job if it won't exceed the concurrency limit(s).
+	   3. Once the ProwJob is updated, wait until we see it updated in our cache before completing
+	      processing and releasing the serialization lock(s) acquired in step 1. This is necessary
+	      to prevent reconciliation threads from processing subsequent jobs before the ProwJob index
+	      used in step 2 is up to date.
+	*/
+	maxConcurrencySerializationLocks *shardedLock
+	jobQueueSerializationLocks       *shardedLock
 }
 
 type shardedLock struct {
 	mapLock *sync.Mutex
-	locks   map[string]*semaphore.Weighted
+	locks   map[string]*sync.Mutex
 }
 
-func (s *shardedLock) getLock(key string) *semaphore.Weighted {
+type buildClient struct {
+	ctrlruntimeclient.Client
+	ssar authorizationv1.SelfSubjectAccessReviewInterface
+}
+
+func (s *shardedLock) getLock(key string) *sync.Mutex {
 	s.mapLock.Lock()
 	defer s.mapLock.Unlock()
 	if _, exists := s.locks[key]; !exists {
-		s.locks[key] = semaphore.NewWeighted(1)
+		s.locks[key] = &sync.Mutex{}
 	}
 	return s.locks[key]
 }
@@ -200,12 +259,16 @@ func (r *reconciler) syncMetrics(ctx context.Context) error {
 type ClusterStatus string
 
 const (
-	ClusterStatusUnreachable ClusterStatus = "Unreachable"
-	ClusterStatusReachable   ClusterStatus = "Reachable"
-	ClusterStatusNoManager   ClusterStatus = "No-Manager"
+	ClusterStatusReachable          ClusterStatus = "Reachable"
+	ClusterStatusNoManager          ClusterStatus = "No-Manager"
+	ClusterStatusError              ClusterStatus = "Error"
+	ClusterStatusMissingPermissions ClusterStatus = "MissingPermissions"
 )
 
-func (r *reconciler) syncClusterStatus(interval time.Duration, knownClusters sets.Set[string]) func(context.Context) error {
+func (r *reconciler) syncClusterStatus(
+	interval time.Duration,
+	knownClusters map[string]rest.Config,
+) func(context.Context) error {
 	return func(ctx context.Context) error {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -233,10 +296,14 @@ func (r *reconciler) syncClusterStatus(interval time.Duration, knownClusters set
 					if !ok {
 						status = ClusterStatusNoManager
 					} else {
-						var pods corev1.PodList
-						if err := client.List(ctx, &pods, ctrlruntimeclient.MatchingLabels{kube.CreatedByProw: "true"}, ctrlruntimeclient.InNamespace(r.config().PodNamespace), ctrlruntimeclient.Limit(1)); err != nil {
-							r.log.WithField("cluster", cluster).WithError(err).Warn("Error listing pod to check for build cluster reachability.")
-							status = ClusterStatusUnreachable
+						// Check for pod verbs.
+						if err := flagutil.CheckAuthorizations(client.ssar, r.config().PodNamespace, RequiredTestPodVerbs()); err != nil {
+							r.log.WithField("cluster", cluster).WithError(err).Warn("Error checking pod verbs to check for build cluster usability.")
+							if errors.Is(err, flagutil.MissingPermissions) {
+								status = ClusterStatusMissingPermissions
+							} else {
+								status = ClusterStatusError
+							}
 						}
 					}
 					clusters[cluster] = status
@@ -277,12 +344,24 @@ func (r *reconciler) defaultReconcile(ctx context.Context, request reconcile.Req
 		// Objects can be deleted from the API while being in our workqueue
 		return reconcile.Result{}, nil
 	}
+	originalPJ := pj.DeepCopy()
 
 	res, err := r.serializeIfNeeded(ctx, pj)
 	if IsTerminalError(err) {
 		// Unfixable cases like missing build clusters, do not return an error to prevent requeuing
-		r.log.WithError(err).WithFields(pjutil.ProwJobFields(pj)).
-			Error("Reconciliation failed with terminal error and will not be requeued")
+		log := r.log.WithError(err).WithFields(pjutil.ProwJobFields(pj))
+		log.Error("Reconciliation failed with terminal error and will not be requeued")
+		if !pj.Complete() {
+			pj.SetComplete()
+			pj.Status.State = prowv1.ErrorState
+			pj.Status.Description = fmt.Sprintf("Terminal error: %v.", err)
+			if err := r.pjClient.Patch(ctx, pj, ctrlruntimeclient.MergeFrom(originalPJ)); err != nil {
+				// If we fail to complete and mark the job as errorer we will try again on the next sync loop.
+				log.Errorf("Error marking job with terminal failure as errored: %v.", err)
+			} else {
+				log.Info("Marked job with terminal failure as errored.")
+			}
+		}
 		return reconcile.Result{}, nil
 	}
 	if res == nil {
@@ -294,19 +373,28 @@ func (r *reconciler) defaultReconcile(ctx context.Context, request reconcile.Req
 	return *res, err
 }
 
-// serializeIfNeeded serializes the reconciliation of Jobs that have a MaxConcurrency setting, otherwise
-// multiple reconciliations of the same job may race and not properly respect that setting.
+// serializeIfNeeded serializes the reconciliation of Jobs that have a MaxConcurrency or a JobQueueName set, otherwise
+// multiple reconciliations of the same job or queue may race and not properly respect that setting.
 func (r *reconciler) serializeIfNeeded(ctx context.Context, pj *prowv1.ProwJob) (*reconcile.Result, error) {
-	if pj.Spec.MaxConcurrency == 0 {
-		return r.reconcile(ctx, pj)
+	if pj.Spec.MaxConcurrency > 0 {
+		// We need to serialize handling of this job name.
+		lock := r.maxConcurrencySerializationLocks.getLock(pj.Spec.Job)
+		// Use TryAcquire to avoid blocking workers waiting for the lock
+		if !lock.TryLock() {
+			return &reconcile.Result{RequeueAfter: time.Second}, nil
+		}
+		defer lock.Unlock()
 	}
 
-	sema := r.serializationLocks.getLock(pj.Spec.Job)
-	// Use TryAcquire to avoid blocking workers waiting for the lock
-	if !sema.TryAcquire(1) {
-		return &reconcile.Result{RequeueAfter: time.Second}, nil
+	if pj.Spec.JobQueueName != "" {
+		// We need to serialize handling of this job queue.
+		lock := r.jobQueueSerializationLocks.getLock(pj.Spec.JobQueueName)
+		// Use TryAcquire to avoid blocking workers waiting for the lock
+		if !lock.TryLock() {
+			return &reconcile.Result{RequeueAfter: time.Second}, nil
+		}
+		defer lock.Unlock()
 	}
-	defer sema.Release(1)
 	return r.reconcile(ctx, pj)
 }
 
@@ -379,7 +467,7 @@ func (r *reconciler) syncPendingJob(ctx context.Context, pj *prowv1.ProwJob) (*r
 			r.log.WithFields(pjutil.ProwJobFields(pj)).Info("Pods Node got evicted, deleting & next sync loop will restart pod")
 			client, ok := r.buildClients[pj.ClusterAlias()]
 			if !ok {
-				return nil, fmt.Errorf("evicted pod %s: unknown cluster alias %q", pod.Name, pj.ClusterAlias())
+				return nil, TerminalError(fmt.Errorf("evicted pod %s: unknown cluster alias %q", pod.Name, pj.ClusterAlias()))
 			}
 			if finalizers := sets.New[string](pod.Finalizers...); finalizers.Has(kubernetesreporterapi.FinalizerName) {
 				// We want the end user to not see this, so we have to remove the finalizer, otherwise the pod hangs
@@ -398,7 +486,7 @@ func (r *reconciler) syncPendingJob(ctx context.Context, pj *prowv1.ProwJob) (*r
 		r.log.WithFields(pjutil.ProwJobFields(pj)).Info("Pods Node got lost, deleting & next sync loop will restart pod")
 		client, ok := r.buildClients[pj.ClusterAlias()]
 		if !ok {
-			return nil, fmt.Errorf("unknown pod %s: unknown cluster alias %q", pod.Name, pj.ClusterAlias())
+			return nil, TerminalError(fmt.Errorf("unknown pod %s: unknown cluster alias %q", pod.Name, pj.ClusterAlias()))
 		}
 
 		if finalizers := sets.New[string](pod.Finalizers...); finalizers.Has(kubernetesreporterapi.FinalizerName) {
@@ -420,7 +508,7 @@ func (r *reconciler) syncPendingJob(ctx context.Context, pj *prowv1.ProwJob) (*r
 			r.log.WithFields(pjutil.ProwJobFields(pj)).Info("Pod is in unknown state, deleting & restarting pod")
 			client, ok := r.buildClients[pj.ClusterAlias()]
 			if !ok {
-				return nil, fmt.Errorf("unknown pod %s: unknown cluster alias %q", pod.Name, pj.ClusterAlias())
+				return nil, TerminalError(fmt.Errorf("unknown pod %s: unknown cluster alias %q", pod.Name, pj.ClusterAlias()))
 			}
 
 			if finalizers := sets.New[string](pod.Finalizers...); finalizers.Has(kubernetesreporterapi.FinalizerName) {
@@ -637,10 +725,10 @@ func (r *reconciler) syncTriggeredJob(ctx context.Context, pj *prowv1.ProwJob) (
 		return nil, fmt.Errorf("patch prowjob: %w", err)
 	}
 
-	// If the job has a MaxConcurrency setting, we must block here until we observe the state transition in our cache,
+	// If the job has either MaxConcurrency or JobQueueName configured, we must block here until we observe the state transition in our cache,
 	// otherwise subequent reconciliations for a different run of the same job might incorrectly conclude that they
 	// can run because that decision is made based on the data in the cache.
-	if pj.Spec.MaxConcurrency == 0 {
+	if pj.Spec.MaxConcurrency == 0 && pj.Spec.JobQueueName == "" {
 		return nil, nil
 	}
 	nn := types.NamespacedName{Namespace: pj.Namespace, Name: pj.Name}
@@ -663,7 +751,7 @@ func (r *reconciler) syncAbortedJob(ctx context.Context, pj *prowv1.ProwJob) err
 
 	buildClient, ok := r.buildClients[pj.ClusterAlias()]
 	if !ok {
-		return fmt.Errorf("no build client available for cluster %s", pj.ClusterAlias())
+		return TerminalError(fmt.Errorf("no build client available for cluster %s", pj.ClusterAlias()))
 	}
 
 	// Just optimistically delete and swallow the potential 404

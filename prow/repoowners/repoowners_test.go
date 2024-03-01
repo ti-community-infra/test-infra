@@ -293,10 +293,6 @@ labels:
 		nil
 }
 
-func TestOwnersDirDenylist(t *testing.T) {
-	testOwnersDirDenylist(localgit.New, t)
-}
-
 func TestOwnersDirDenylistV2(t *testing.T) {
 	testOwnersDirDenylist(localgit.NewV2, t)
 }
@@ -415,10 +411,6 @@ func testOwnersDirDenylist(clients localgit.Clients, t *testing.T) {
 	}
 }
 
-func TestOwnersRegexpFiltering(t *testing.T) {
-	testOwnersRegexpFiltering(localgit.New, t)
-}
-
 func TestOwnersRegexpFilteringV2(t *testing.T) {
 	testOwnersRegexpFiltering(localgit.NewV2, t)
 }
@@ -454,10 +446,6 @@ func testOwnersRegexpFiltering(clients localgit.Clients, t *testing.T) {
 
 func strP(str string) *string {
 	return &str
-}
-
-func TestLoadRepoOwners(t *testing.T) {
-	testLoadRepoOwners(localgit.New, t)
 }
 
 func TestLoadRepoOwnersV2(t *testing.T) {
@@ -1170,12 +1158,12 @@ func TestGetApprovers(t *testing.T) {
 			expectedAllOwners:  sets.New[string]("alice", "bob"),
 		},
 		{
-			name: "Modified Nonexistent Dir (Default to Base)",
+			name:               "Modified Nonexistent Dir (Default to Base)",
 			ro: &RepoOwners{
 				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
 					"": regexpAll("alice", "bob"),
 				},
-			},
+			},      
 			filePath:           filepath.Join(nonExistentDir, "testFile.md"),
 			expectedOwnersPath: "",
 			expectedLeafOwners: sets.New[string]("alice", "bob"),

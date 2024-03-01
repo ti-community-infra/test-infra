@@ -3,13 +3,14 @@
 presubmits:
   kubernetes/kops:
 
-# {"cloud": "aws", "distro": "u2004", "extra_flags": "--node-size=t3.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "amazonvpc"}
+# {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "amazonvpc"}
   - name: pull-kops-e2e-cni-amazonvpc
+    cluster: default
     branches:
     - master
     run_if_changed: '^(upup\/models\/cloudup\/resources\/addons\/networking\.amazon-vpc-routed-eni\/|pkg\/model\/(firewall|components\/containerd|components\/kubeproxy|iam\/iam_builder)\.go|nodeup\/pkg\/model\/kubelet\.go)'
     always_run: false
-    optional: true
+    optional: false
     skip_report: false
     labels:
       preset-service-account: "true"
@@ -22,7 +23,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -35,13 +36,12 @@ presubmits:
             -v 2 \
             --up --build --down \
             --cloud-provider=aws \
-            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20230906' --channel=alpha --networking=amazonvpc --node-size=t3.large --discovery-store=s3://k8s-kops-prow/discovery" \
+            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20240220' --channel=alpha --networking=amazonvpc --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
             --kubernetes-version=https://dl.k8s.io/release/stable.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/.build/dist/linux/amd64/kops \
             --test=kops \
             -- \
-            --ginkgo-args="--debug" \
-            --test-args="-test.timeout=60m -num-nodes=0" \
+            --test-args="-test.timeout=60m" \
             --test-package-marker=stable.txt \
             --parallel=25
         securityContext:
@@ -54,13 +54,16 @@ presubmits:
         - name: GOPATH
           value: /home/prow/go
         resources:
+          limits:
+            cpu: "4"
+            memory: 6Gi
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "4"
+            memory: 6Gi
     annotations:
       test.kops.k8s.io/cloud: aws
-      test.kops.k8s.io/distro: u2004
-      test.kops.k8s.io/extra_flags: --node-size=t3.large --discovery-store=s3://k8s-kops-prow/discovery
+      test.kops.k8s.io/distro: u2204arm64
+      test.kops.k8s.io/extra_flags: --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery
       test.kops.k8s.io/k8s_version: stable
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: amazonvpc
@@ -68,8 +71,9 @@ presubmits:
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-amazonvpc
 
-# {"cloud": "aws", "distro": "u2004", "extra_flags": "--ipv6 --topology=private --bastion --zones=us-west-2a --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "amazonvpc"}
+# {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--ipv6 --topology=private --bastion --zones=us-west-2a --dns=public --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "amazonvpc"}
   - name: pull-kops-e2e-cni-amazonvpc-ipv6
+    cluster: default
     branches:
     - master
     always_run: false
@@ -86,7 +90,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -99,13 +103,12 @@ presubmits:
             -v 2 \
             --up --build --down \
             --cloud-provider=aws \
-            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20230906' --channel=alpha --networking=amazonvpc --ipv6 --topology=private --bastion --zones=us-west-2a --discovery-store=s3://k8s-kops-prow/discovery" \
+            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20240220' --channel=alpha --networking=amazonvpc --ipv6 --topology=private --bastion --zones=us-west-2a --dns=public --discovery-store=s3://k8s-kops-prow/discovery" \
             --kubernetes-version=https://dl.k8s.io/release/stable.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/.build/dist/linux/amd64/kops \
             --test=kops \
             -- \
-            --ginkgo-args="--debug" \
-            --test-args="-test.timeout=60m -num-nodes=0" \
+            --test-args="-test.timeout=60m" \
             --test-package-marker=stable.txt \
             --parallel=25
         securityContext:
@@ -118,13 +121,16 @@ presubmits:
         - name: GOPATH
           value: /home/prow/go
         resources:
+          limits:
+            cpu: "4"
+            memory: 6Gi
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "4"
+            memory: 6Gi
     annotations:
       test.kops.k8s.io/cloud: aws
-      test.kops.k8s.io/distro: u2004
-      test.kops.k8s.io/extra_flags: --ipv6 --topology=private --bastion --zones=us-west-2a --discovery-store=s3://k8s-kops-prow/discovery
+      test.kops.k8s.io/distro: u2204arm64
+      test.kops.k8s.io/extra_flags: --ipv6 --topology=private --bastion --zones=us-west-2a --dns=public --discovery-store=s3://k8s-kops-prow/discovery
       test.kops.k8s.io/k8s_version: stable
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: amazonvpc
@@ -134,6 +140,7 @@ presubmits:
 
 # {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "calico"}
   - name: pull-kops-e2e-cni-calico
+    cluster: default
     branches:
     - master
     run_if_changed: '^(upup\/models\/cloudup\/resources\/addons\/networking\.projectcalico\.org\/|pkg\/model\/(components\/containerd|firewall|pki|iam\/iam_builder)\.go|nodeup\/pkg\/model\/networking\/calico\.go)'
@@ -151,7 +158,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -164,13 +171,12 @@ presubmits:
             -v 2 \
             --up --build --down \
             --cloud-provider=aws \
-            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20230907' --channel=alpha --networking=calico --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
+            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20240220' --channel=alpha --networking=calico --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
             --kubernetes-version=https://dl.k8s.io/release/stable.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/.build/dist/linux/amd64/kops \
             --test=kops \
             -- \
-            --ginkgo-args="--debug" \
-            --test-args="-test.timeout=60m -num-nodes=0" \
+            --test-args="-test.timeout=60m" \
             --test-package-marker=stable.txt \
             --parallel=25
         securityContext:
@@ -183,9 +189,12 @@ presubmits:
         - name: GOPATH
           value: /home/prow/go
         resources:
+          limits:
+            cpu: "4"
+            memory: 6Gi
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "4"
+            memory: 6Gi
     annotations:
       test.kops.k8s.io/cloud: aws
       test.kops.k8s.io/distro: u2204arm64
@@ -197,13 +206,14 @@ presubmits:
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-calico
 
-# {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--ipv6 --topology=private --bastion --zones=us-west-2a --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "calico"}
+# {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--ipv6 --topology=private --bastion --zones=us-west-2a --dns=public --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "calico"}
   - name: pull-kops-e2e-cni-calico-ipv6
+    cluster: default
     branches:
     - master
     run_if_changed: '^(upup\/models\/cloudup\/resources\/addons\/networking\.projectcalico\.org\/|pkg\/model\/(components\/containerd|firewall|pki|iam\/iam_builder)\.go|nodeup\/pkg\/model\/networking\/calico\.go)'
     always_run: false
-    optional: false
+    optional: true
     skip_report: false
     labels:
       preset-service-account: "true"
@@ -216,7 +226,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -229,13 +239,12 @@ presubmits:
             -v 2 \
             --up --build --down \
             --cloud-provider=aws \
-            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20230907' --channel=alpha --networking=calico --ipv6 --topology=private --bastion --zones=us-west-2a --discovery-store=s3://k8s-kops-prow/discovery" \
+            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20240220' --channel=alpha --networking=calico --ipv6 --topology=private --bastion --zones=us-west-2a --dns=public --discovery-store=s3://k8s-kops-prow/discovery" \
             --kubernetes-version=https://dl.k8s.io/release/stable.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/.build/dist/linux/amd64/kops \
             --test=kops \
             -- \
-            --ginkgo-args="--debug" \
-            --test-args="-test.timeout=60m -num-nodes=0" \
+            --test-args="-test.timeout=60m" \
             --test-package-marker=stable.txt \
             --parallel=25
         securityContext:
@@ -248,13 +257,16 @@ presubmits:
         - name: GOPATH
           value: /home/prow/go
         resources:
+          limits:
+            cpu: "4"
+            memory: 6Gi
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "4"
+            memory: 6Gi
     annotations:
       test.kops.k8s.io/cloud: aws
       test.kops.k8s.io/distro: u2204arm64
-      test.kops.k8s.io/extra_flags: --ipv6 --topology=private --bastion --zones=us-west-2a --discovery-store=s3://k8s-kops-prow/discovery
+      test.kops.k8s.io/extra_flags: --ipv6 --topology=private --bastion --zones=us-west-2a --dns=public --discovery-store=s3://k8s-kops-prow/discovery
       test.kops.k8s.io/k8s_version: stable
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: calico
@@ -264,6 +276,7 @@ presubmits:
 
 # {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "1.27", "kops_channel": "alpha", "networking": "canal"}
   - name: pull-kops-e2e-cni-canal
+    cluster: default
     branches:
     - master
     run_if_changed: '^(upup\/models\/cloudup\/resources\/addons\/networking\.projectcalico\.org\.canal\/)'
@@ -281,7 +294,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -294,13 +307,12 @@ presubmits:
             -v 2 \
             --up --build --down \
             --cloud-provider=aws \
-            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20230907' --channel=alpha --networking=canal --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
+            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20240220' --channel=alpha --networking=canal --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
             --kubernetes-version=https://dl.k8s.io/release/stable-1.27.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/.build/dist/linux/amd64/kops \
             --test=kops \
             -- \
-            --ginkgo-args="--debug" \
-            --test-args="-test.timeout=60m -num-nodes=0" \
+            --test-args="-test.timeout=60m" \
             --test-package-marker=stable-1.27.txt \
             --parallel=25
         securityContext:
@@ -313,9 +325,12 @@ presubmits:
         - name: GOPATH
           value: /home/prow/go
         resources:
+          limits:
+            cpu: "4"
+            memory: 6Gi
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "4"
+            memory: 6Gi
     annotations:
       test.kops.k8s.io/cloud: aws
       test.kops.k8s.io/distro: u2204arm64
@@ -329,6 +344,7 @@ presubmits:
 
 # {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "cilium"}
   - name: pull-kops-e2e-cni-cilium
+    cluster: default
     branches:
     - master
     run_if_changed: '^(upup\/models\/cloudup\/resources\/addons\/networking\.cilium\.io\/|pkg\/model\/(components\/containerd|firewall|components\/cilium|iam\/iam_builder)\.go|nodeup\/pkg\/model\/(context|networking\/cilium)\.go)'
@@ -346,7 +362,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -359,13 +375,12 @@ presubmits:
             -v 2 \
             --up --build --down \
             --cloud-provider=aws \
-            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20230907' --channel=alpha --networking=cilium --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
+            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20240220' --channel=alpha --networking=cilium --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
             --kubernetes-version=https://dl.k8s.io/release/stable.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/.build/dist/linux/amd64/kops \
             --test=kops \
             -- \
-            --ginkgo-args="--debug" \
-            --test-args="-test.timeout=60m -num-nodes=0" \
+            --test-args="-test.timeout=60m" \
             --test-package-marker=stable.txt \
             --parallel=25
         securityContext:
@@ -378,9 +393,12 @@ presubmits:
         - name: GOPATH
           value: /home/prow/go
         resources:
+          limits:
+            cpu: "4"
+            memory: 6Gi
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "4"
+            memory: 6Gi
     annotations:
       test.kops.k8s.io/cloud: aws
       test.kops.k8s.io/distro: u2204arm64
@@ -392,13 +410,14 @@ presubmits:
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-cilium
 
-# {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--ipv6 --topology=private --bastion --zones=us-west-2a --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "cilium"}
+# {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--ipv6 --topology=private --bastion --zones=us-west-2a --dns=public --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "cilium"}
   - name: pull-kops-e2e-cni-cilium-ipv6
+    cluster: default
     branches:
     - master
     run_if_changed: '^(upup\/models\/cloudup\/resources\/addons\/networking\.cilium\.io\/|pkg\/model\/(components\/containerd|firewall|components\/cilium|iam\/iam_builder)\.go|nodeup\/pkg\/model\/(context|networking\/cilium)\.go)'
     always_run: false
-    optional: false
+    optional: true
     skip_report: false
     labels:
       preset-service-account: "true"
@@ -411,7 +430,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -424,13 +443,12 @@ presubmits:
             -v 2 \
             --up --build --down \
             --cloud-provider=aws \
-            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20230907' --channel=alpha --networking=cilium --ipv6 --topology=private --bastion --zones=us-west-2a --discovery-store=s3://k8s-kops-prow/discovery" \
+            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20240220' --channel=alpha --networking=cilium --ipv6 --topology=private --bastion --zones=us-west-2a --dns=public --discovery-store=s3://k8s-kops-prow/discovery" \
             --kubernetes-version=https://dl.k8s.io/release/stable.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/.build/dist/linux/amd64/kops \
             --test=kops \
             -- \
-            --ginkgo-args="--debug" \
-            --test-args="-test.timeout=60m -num-nodes=0" \
+            --test-args="-test.timeout=60m" \
             --test-package-marker=stable.txt \
             --parallel=25
         securityContext:
@@ -443,13 +461,16 @@ presubmits:
         - name: GOPATH
           value: /home/prow/go
         resources:
+          limits:
+            cpu: "4"
+            memory: 6Gi
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "4"
+            memory: 6Gi
     annotations:
       test.kops.k8s.io/cloud: aws
       test.kops.k8s.io/distro: u2204arm64
-      test.kops.k8s.io/extra_flags: --ipv6 --topology=private --bastion --zones=us-west-2a --discovery-store=s3://k8s-kops-prow/discovery
+      test.kops.k8s.io/extra_flags: --ipv6 --topology=private --bastion --zones=us-west-2a --dns=public --discovery-store=s3://k8s-kops-prow/discovery
       test.kops.k8s.io/k8s_version: stable
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: cilium
@@ -459,6 +480,7 @@ presubmits:
 
 # {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "cilium-etcd"}
   - name: pull-kops-e2e-cni-cilium-etcd
+    cluster: default
     branches:
     - master
     run_if_changed: '^(upup\/models\/cloudup\/resources\/addons\/networking\.cilium\.io\/|pkg\/model\/(components\/containerd|firewall|components\/cilium|iam\/iam_builder)\.go|nodeup\/pkg\/model\/(context|networking\/cilium)\.go)'
@@ -476,7 +498,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -489,13 +511,12 @@ presubmits:
             -v 2 \
             --up --build --down \
             --cloud-provider=aws \
-            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20230907' --channel=alpha --networking=cilium-etcd --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
+            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20240220' --channel=alpha --networking=cilium-etcd --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
             --kubernetes-version=https://dl.k8s.io/release/stable.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/.build/dist/linux/amd64/kops \
             --test=kops \
             -- \
-            --ginkgo-args="--debug" \
-            --test-args="-test.timeout=60m -num-nodes=0" \
+            --test-args="-test.timeout=60m" \
             --test-package-marker=stable.txt \
             --parallel=25
         securityContext:
@@ -508,9 +529,12 @@ presubmits:
         - name: GOPATH
           value: /home/prow/go
         resources:
+          limits:
+            cpu: "4"
+            memory: 6Gi
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "4"
+            memory: 6Gi
     annotations:
       test.kops.k8s.io/cloud: aws
       test.kops.k8s.io/distro: u2204arm64
@@ -524,6 +548,7 @@ presubmits:
 
 # {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "stable", "kops_channel": "alpha", "networking": "cilium-eni"}
   - name: pull-kops-e2e-cni-cilium-eni
+    cluster: default
     branches:
     - master
     run_if_changed: '^(upup\/models\/cloudup\/resources\/addons\/networking\.cilium\.io\/|pkg\/model\/(components\/containerd|firewall|components\/cilium|iam\/iam_builder)\.go|nodeup\/pkg\/model\/(context|networking\/cilium)\.go)'
@@ -541,7 +566,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -554,13 +579,12 @@ presubmits:
             -v 2 \
             --up --build --down \
             --cloud-provider=aws \
-            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20230907' --channel=alpha --networking=cilium-eni --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
+            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20240220' --channel=alpha --networking=cilium-eni --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
             --kubernetes-version=https://dl.k8s.io/release/stable.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/.build/dist/linux/amd64/kops \
             --test=kops \
             -- \
-            --ginkgo-args="--debug" \
-            --test-args="-test.timeout=60m -num-nodes=0" \
+            --test-args="-test.timeout=60m" \
             --test-package-marker=stable.txt \
             --parallel=25
         securityContext:
@@ -573,9 +597,12 @@ presubmits:
         - name: GOPATH
           value: /home/prow/go
         resources:
+          limits:
+            cpu: "4"
+            memory: 6Gi
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "4"
+            memory: 6Gi
     annotations:
       test.kops.k8s.io/cloud: aws
       test.kops.k8s.io/distro: u2204arm64
@@ -589,6 +616,7 @@ presubmits:
 
 # {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "1.27", "kops_channel": "alpha", "networking": "flannel"}
   - name: pull-kops-e2e-cni-flannel
+    cluster: default
     branches:
     - master
     run_if_changed: '^(upup\/models\/cloudup\/resources\/addons\/networking\.flannel\/|pkg\/model\/components\/containerd\.go)'
@@ -606,7 +634,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -619,13 +647,12 @@ presubmits:
             -v 2 \
             --up --build --down \
             --cloud-provider=aws \
-            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20230907' --channel=alpha --networking=flannel --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
+            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20240220' --channel=alpha --networking=flannel --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
             --kubernetes-version=https://dl.k8s.io/release/stable-1.27.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/.build/dist/linux/amd64/kops \
             --test=kops \
             -- \
-            --ginkgo-args="--debug" \
-            --test-args="-test.timeout=60m -num-nodes=0" \
+            --test-args="-test.timeout=60m" \
             --test-package-marker=stable-1.27.txt \
             --parallel=25
         securityContext:
@@ -638,9 +665,12 @@ presubmits:
         - name: GOPATH
           value: /home/prow/go
         resources:
+          limits:
+            cpu: "4"
+            memory: 6Gi
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "4"
+            memory: 6Gi
     annotations:
       test.kops.k8s.io/cloud: aws
       test.kops.k8s.io/distro: u2204arm64
@@ -652,8 +682,9 @@ presubmits:
       testgrid-days-of-results: '90'
       testgrid-tab-name: e2e-flannel
 
-# {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "1.27", "kops_channel": "alpha", "networking": "kube-router"}
+# {"cloud": "aws", "distro": "u2204arm64", "extra_flags": "--node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery", "k8s_version": "ci", "kops_channel": "alpha", "networking": "kube-router"}
   - name: pull-kops-e2e-cni-kuberouter
+    cluster: default
     branches:
     - master
     run_if_changed: '^(upup\/models\/cloudup\/resources\/addons\/networking\.kuberouter\/|pkg\/model\/components\/containerd\.go)'
@@ -671,7 +702,7 @@ presubmits:
     path_alias: k8s.io/kops
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         imagePullPolicy: Always
         command:
         - runner.sh
@@ -684,14 +715,15 @@ presubmits:
             -v 2 \
             --up --build --down \
             --cloud-provider=aws \
-            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20230907' --channel=alpha --networking=kube-router --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
-            --kubernetes-version=https://dl.k8s.io/release/stable-1.27.txt \
+            --create-args="--image='099720109477/ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20240220' --channel=alpha --networking=kube-router --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery" \
+            --kubernetes-version=https://storage.googleapis.com/k8s-release-dev/ci/latest.txt \
             --kops-binary-path=/home/prow/go/src/k8s.io/kops/.build/dist/linux/amd64/kops \
             --test=kops \
             -- \
-            --ginkgo-args="--debug" \
-            --test-args="-test.timeout=60m -num-nodes=0" \
-            --test-package-marker=stable-1.27.txt \
+            --test-args="-test.timeout=60m" \
+            --test-package-url=https://storage.googleapis.com/k8s-release-dev \
+            --test-package-dir=ci \
+            --test-package-marker=latest.txt \
             --parallel=25
         securityContext:
           privileged: true
@@ -703,14 +735,17 @@ presubmits:
         - name: GOPATH
           value: /home/prow/go
         resources:
+          limits:
+            cpu: "4"
+            memory: 6Gi
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "4"
+            memory: 6Gi
     annotations:
       test.kops.k8s.io/cloud: aws
       test.kops.k8s.io/distro: u2204arm64
       test.kops.k8s.io/extra_flags: --node-size=t4g.large --discovery-store=s3://k8s-kops-prow/discovery
-      test.kops.k8s.io/k8s_version: '1.27'
+      test.kops.k8s.io/k8s_version: ci
       test.kops.k8s.io/kops_channel: alpha
       test.kops.k8s.io/networking: kube-router
       testgrid-dashboards: kops-presubmits, presubmits-kops, sig-cluster-lifecycle-kops

@@ -10,7 +10,7 @@ periodics:
     testgrid-tab-name: api-review-help
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -27,7 +27,7 @@ periodics:
         -label:do-not-merge/hold
         -label:needs-rebase
         -label:api-review
-        -project:kubernetes/13
+        -project:kubernetes/169
         NOT "complete the pre-review checklist and request an API review"
       - --updated=5m
       - --token=/etc/github-token/token
@@ -37,7 +37,7 @@ periodics:
 
         If so, when the changes are ready, [complete the pre-review checklist and request an API review](https://git.k8s.io/community/sig-architecture/api-review-process.md#mechanics).
 
-        Status of requested reviews is tracked in the [API Review project](https://github.com/orgs/kubernetes/projects/13).
+        Status of requested reviews is tracked in the [API Review project](https://github.com/orgs/kubernetes/projects/169).
       - --ceiling=10
       - --confirm
       volumeMounts:
@@ -58,7 +58,7 @@ periodics:
     testgrid-tab-name: stable-metrics-help
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -98,7 +98,7 @@ periodics:
     testgrid-tab-name: cla
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -141,7 +141,7 @@ periodics:
     testgrid-tab-name: close-issues
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -153,6 +153,7 @@ periodics:
         is:issue
         -repo:kubernetes-sigs/kind
         -repo:kubernetes/kubectl
+        -repo:kubernetes/steering
         -label:lifecycle/frozen
         -label:"help wanted"
         -label:"good first issue"
@@ -201,7 +202,7 @@ periodics:
     testgrid-tab-name: close-prs
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -213,6 +214,7 @@ periodics:
         is:pr
         -repo:kubernetes-sigs/kind
         -repo:kubernetes/ingress-nginx
+        -repo:kubernetes/steering
         -label:lifecycle/frozen
         label:lifecycle/rotten
       - --updated=720h
@@ -257,7 +259,7 @@ periodics:
     description: Automatically /retest for approved PRs that are failing tests
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -325,7 +327,7 @@ periodics:
     testgrid-tab-name: rotten-issues
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -337,6 +339,7 @@ periodics:
         is:issue
         -repo:kubernetes-sigs/kind
         -repo:kubernetes/ingress-nginx
+        -repo:kubernetes/steering
         -label:lifecycle/frozen
         -label:lifecycle/rotten
         -label:"help wanted"
@@ -385,7 +388,7 @@ periodics:
     testgrid-tab-name: rotten-prs
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -397,6 +400,7 @@ periodics:
         is:pr
         -repo:kubernetes-sigs/kind
         -repo:kubernetes/ingress-nginx
+        -repo:kubernetes/steering
         -label:lifecycle/frozen
         -label:lifecycle/rotten
         label:lifecycle/stale
@@ -442,7 +446,7 @@ periodics:
     testgrid-tab-name: stale-issues
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -454,6 +458,7 @@ periodics:
         is:issue
         -repo:kubernetes-sigs/kind
         -repo:kubernetes/ingress-nginx
+        -repo:kubernetes/steering
         -label:lifecycle/frozen
         -label:lifecycle/stale
         -label:lifecycle/rotten
@@ -502,7 +507,7 @@ periodics:
     testgrid-tab-name: stale-prs
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -514,6 +519,7 @@ periodics:
         is:pr
         -repo:kubernetes-sigs/kind
         -repo:kubernetes/ingress-nginx
+        -repo:kubernetes/steering
         -label:lifecycle/frozen
         -label:lifecycle/stale
         -label:lifecycle/rotten
@@ -559,7 +565,7 @@ periodics:
     testgrid-tab-name: thaw-prs
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -607,7 +613,7 @@ periodics:
     testgrid-tab-name: re-triage
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -617,6 +623,7 @@ periodics:
         org:kubernetes-client
         org:kubernetes-csi
         -repo:kubernetes-sigs/kind
+        -repo:kubernetes/steering
         label:triage/accepted
         -label:priority/important-soon
         -label:priority/critical-urgent
@@ -655,7 +662,7 @@ periodics:
     testgrid-tab-name: re-triage-important
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -665,6 +672,7 @@ periodics:
         org:kubernetes-client
         org:kubernetes-csi
         -repo:kubernetes-sigs/kind
+        -repo:kubernetes/steering
         label:triage/accepted
         label:priority/important-soon
         is:issue
@@ -704,7 +712,7 @@ periodics:
     testgrid-tab-name: re-triage-critical
   spec:
     containers:
-    - image: gcr.io/k8s-prow/commenter:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/commenter:v20240228-d64ece9e05
       command:
       - commenter
       args:
@@ -714,6 +722,7 @@ periodics:
         org:kubernetes-client
         org:kubernetes-csi
         -repo:kubernetes-sigs/kind
+        -repo:kubernetes/steering
         label:triage/accepted
         label:priority/critical-urgent
         is:issue
@@ -754,7 +763,7 @@ periodics:
     description: Creates github issues based on data from various 'IssueSource's.
   spec:
     containers:
-    - image: gcr.io/k8s-prow/issue-creator:v20230908-12387e8f71
+    - image: gcr.io/k8s-prow/issue-creator:v20240228-d64ece9e05
       command:
       - issue-creator
       args:

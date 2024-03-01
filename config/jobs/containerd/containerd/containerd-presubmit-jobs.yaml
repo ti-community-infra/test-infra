@@ -16,7 +16,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         args:
@@ -52,7 +52,7 @@ presubmits:
     spec:
       containers:
       - name: pull-containerd-node-e2e
-        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         env:
         - name: USE_TEST_INFRA_LOG_DUMPING
           value: "true"
@@ -103,7 +103,7 @@ presubmits:
     spec:
       containers:
       - name: pull-containerd-node-e2e
-        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         env:
         - name: USE_TEST_INFRA_LOG_DUMPING
           value: "true"
@@ -138,7 +138,7 @@ presubmits:
     extra_refs:
     - org: kubernetes
       repo: kubernetes
-      base_ref: release-1.26
+      base_ref: master
       path_alias: k8s.io/kubernetes
     - org: kubernetes
       repo: test-infra
@@ -154,7 +154,7 @@ presubmits:
     spec:
       containers:
       - name: pull-containerd-node-e2e-1-6
-        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         env:
         - name: USE_TEST_INFRA_LOG_DUMPING
           value: "true"
@@ -178,55 +178,72 @@ presubmits:
           --timeout=65m
           "--node-args=--image-config-file=${GOPATH}/src/k8s.io/test-infra/jobs/e2e_node/containerd/containerd-release-1.6-presubmit/image-config-presubmit.yaml -node-env=PULL_REFS=$(PULL_REFS)"
 
-  - name: pull-containerd-sandboxed-node-e2e
-    always_run: false
-    max_concurrency: 8
-    decorate: true
-    branches:
-    - main
-    decoration_config:
-      timeout: 100m
-    extra_refs:
-    - org: kubernetes
-      repo: kubernetes
-      base_ref: master
-      path_alias: k8s.io/kubernetes
-    - org: kubernetes
-      repo: test-infra
-      base_ref: master
-      path_alias: k8s.io/test-infra
+  - name: pull-containerd-k8s-e2e-ec2
+    skip_branches:
+      - release-\d+\.\d+  # per-release image
     annotations:
-      testgrid-dashboards: sig-node-containerd,containerd-presubmits
-      testgrid-tab-name: pull-containerd-sandboxed-node-e2e
-      description: run node e2e tests sandboxed
+      testgrid-alert-stale-results-hours: "24"
+      testgrid-create-test-group: "true"
+      testgrid-num-failures-to-alert: "10"
+      testgrid-dashboards: presubmits-ec2
+      description: Runs presubmit tests using kubetest2-ec2 against kubernetes master on EC2 using containerd master
     labels:
       preset-service-account: "true"
-      preset-k8s-ssh: "true"
+      preset-e2e-containerd-ec2: "true"
+      preset-dind-enabled: "true"
+    always_run: false
+    optional: true
+    cluster: eks-prow-build-cluster
+    decorate: true
+    decoration_config:
+      timeout: 4h
+    extra_refs:
+      - org: kubernetes
+        repo: kubernetes
+        base_ref: master
+        path_alias: k8s.io/kubernetes
+      - org: kubernetes
+        repo: test-infra
+        base_ref: master
+        path_alias: k8s.io/test-infra
+      - org: kubernetes-sigs
+        repo: provider-aws-test-infra
+        base_ref: main
+        path_alias: sigs.k8s.io/provider-aws-test-infra
     spec:
+      serviceAccountName: node-e2e-tests
       containers:
-      - name: pull-containerd-node-e2e
-        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
-        env:
-        - name: USE_TEST_INFRA_LOG_DUMPING
-          value: "true"
-        - name: ENABLE_CRI_SANDBOXES
-          value: "sandboxed"
-        command:
-        - sh
-        - -c
-        - >
-          runner.sh
-          ./test/build.sh
-          &&
-          cd ${GOPATH}/src/k8s.io/kubernetes
-          &&
-          /workspace/scenarios/kubernetes_e2e.py
-          --deployment=node
-          --gcp-project=cri-c8d-pr-node-e2e
-          --gcp-zone=us-central1-f
-          '--node-test-args=--container-runtime-endpoint=unix:///run/containerd/containerd.sock --container-runtime-process-name=/home/containerd/usr/local/bin/containerd --container-runtime-pid-file= --kubelet-flags="--cgroup-driver=systemd --cgroups-per-qos=true --cgroup-root=/ --runtime-cgroups=/system.slice/containerd.service"'
-          --node-tests=true
-          --provider=gce
-          '--test_args=--nodes=8 --focus="\[NodeConformance\]|\[NodeFeature:.+\]|\[NodeFeature\]" --skip="\[Flaky\]|\[Slow\]|\[Serial\]"'
-          --timeout=65m
-          "--node-args=--image-config-file=${GOPATH}/src/k8s.io/test-infra/jobs/e2e_node/containerd/containerd-main-presubmit/image-config-presubmit.yaml -node-env=PULL_REFS=$(PULL_REFS)"
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
+          command:
+            - runner.sh
+          args:
+            - bash
+            - -c
+            - |
+              ./test/build.sh
+              GOPROXY=direct go install sigs.k8s.io/provider-aws-test-infra/kubetest2-ec2@latest
+              export CONTAINERD_PULL_REFS=$PULL_REFS
+              echo "CONTAINERD_PULL_REFS: $CONTAINERD_PULL_REFS"
+              VERSION=$(curl -Ls https://dl.k8s.io/ci/latest.txt)
+              kubetest2 ec2 \
+               --stage https://dl.k8s.io/ci/ \
+               --version $VERSION \
+               --up \
+               --down \
+               --test=ginkgo \
+               -- \
+               --parallel=30 \
+               --skip-regex='\[Driver:.gcepd\]|\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]'
+          env:
+            - name: USE_DOCKERIZED_BUILD
+              value: "true"
+          # docker-in-docker needs privileged mode
+          securityContext:
+            privileged: true
+          resources:
+            limits:
+              cpu: 8
+              memory: 10Gi
+            requests:
+              cpu: 8
+              memory: 10Gi

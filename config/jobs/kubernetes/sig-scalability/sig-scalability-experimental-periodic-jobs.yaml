@@ -1,5 +1,6 @@
 periodics:
 - name: ci-kubernetes-storage-scalability
+  cluster: k8s-infra-prow-build
   tags:
     - "perfDashPrefix: storage"
     - "perfDashJobType: storage"
@@ -27,7 +28,7 @@ periodics:
     testgrid-tab-name: storage
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -47,8 +48,13 @@ periodics:
       - --test-cmd-args=--testsuite=testing/experimental/storage/pod-startup/suite.yaml
       - --test-cmd-name=ClusterLoaderV2
       - --timeout=300m
-      - --use-logexporter
-      - --logexporter-gcs-path=gs://sig-scalability-logs/$(JOB_NAME)/$(BUILD_ID)
+      resources:
+        requests:
+          cpu: 2
+          memory: "4Gi"
+        limits:
+          cpu: 2
+          memory: "4Gi"
 
 - name: ci-kubernetes-e2e-gci-gce-scalability-networkpolicies
   cluster: k8s-infra-prow-build
@@ -79,7 +85,7 @@ periodics:
     testgrid-tab-name: calico
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -155,7 +161,7 @@ periodics:
     testgrid-tab-name: watchlist-off
   spec:
     containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
           - runner.sh
           - /workspace/scenarios/kubernetes_e2e.py
@@ -165,7 +171,7 @@ periodics:
           - --env=KUBE_GCE_PRIVATE_CLUSTER=false #TODO(#29500): revert when private cluster setup is fixed
           - --extract=ci/latest
           - --gcp-node-image=gci
-          - --gcp-master-size=n1-standard-32
+          - --gcp-master-size=n2-standard-32
           - --gcp-node-size=e2-standard-16
           - --gcp-nodes=1
           - --gcp-project-type=scalability-project
@@ -219,7 +225,7 @@ periodics:
     testgrid-tab-name: watchlist-on
   spec:
     containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
           - runner.sh
           - /workspace/scenarios/kubernetes_e2e.py
@@ -231,7 +237,7 @@ periodics:
           - --env=KUBE_FEATURE_GATES=WatchList=true
           - --extract=ci/latest
           - --gcp-node-image=gci
-          - --gcp-master-size=n1-standard-32
+          - --gcp-master-size=n2-standard-32
           - --gcp-node-size=e2-standard-16
           - --gcp-nodes=1
           - --gcp-project-type=scalability-project
@@ -280,7 +286,7 @@ periodics:
     testgrid-tab-name: consistent-list-from-cache-on-large-objects
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -349,7 +355,7 @@ periodics:
     testgrid-tab-name: consistent-list-from-cache-off-large-objects
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -418,7 +424,7 @@ periodics:
     testgrid-tab-name: consistent-list-from-cache-on-small-objects
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -487,7 +493,7 @@ periodics:
     testgrid-tab-name: consistent-list-from-cache-off-small-objects
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py

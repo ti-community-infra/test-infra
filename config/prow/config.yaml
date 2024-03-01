@@ -13,10 +13,10 @@ plank:
       timeout: 2h
       grace_period: 15m
       utility_images:
-        clonerefs: "gcr.io/k8s-prow/clonerefs:v20230908-12387e8f71"
-        initupload: "gcr.io/k8s-prow/initupload:v20230908-12387e8f71"
-        entrypoint: "gcr.io/k8s-prow/entrypoint:v20230908-12387e8f71"
-        sidecar: "gcr.io/k8s-prow/sidecar:v20230908-12387e8f71"
+        clonerefs: "gcr.io/k8s-prow/clonerefs:v20240228-d64ece9e05"
+        initupload: "gcr.io/k8s-prow/initupload:v20240228-d64ece9e05"
+        entrypoint: "gcr.io/k8s-prow/entrypoint:v20240228-d64ece9e05"
+        sidecar: "gcr.io/k8s-prow/sidecar:v20240228-d64ece9e05"
       gcs_configuration:
         bucket: "kubernetes-jenkins"
         path_strategy: "legacy"
@@ -36,6 +36,7 @@ plank:
         sidecar:
           requests:
             cpu: 100m
+      blobless_fetch: true
   - cluster: gke_rules-k8s_us-central1-f_testing
     config:
       gcs_credentials_secret: ""
@@ -206,8 +207,10 @@ managed_webhooks:
       token_created_after: 2020-08-12T00:00:00Z
     containerd/containerd:
       token_created_after: 2020-09-17T00:00:00Z
-    cncf/apisnoop:
+    kubernetes-sigs/apisnoop:
       token_created_after: 2020-09-22T00:00:00Z
+    etcd-io:
+      token_created_after: 2023-11-13T00:00:00Z
 
 slack_reporter_configs:
   '*':
@@ -562,15 +565,14 @@ branch-protection:
           branches:
             gh-pages:
               protect: false
+        hydrophone:
+          exclude:
+            - "^dependencies/" # don't protect branches created by github action that updates dependencies
         kernel-module-management:
           required_status_checks:
             contexts:
               - e2e
               - e2e-hub
-        kube-batch:
-          required_status_checks:
-            contexts:
-            - continuous-integration/travis-ci
         kubectl-validate:
           required_status_checks:
             contexts:
@@ -610,6 +612,9 @@ branch-protection:
           branches:
             gh-pages:
               protect: false
+        provider-aws-test-infra:
+          exclude:
+            - "^dependencies/" # don't protect branches created by github action that updates dependencies
         secrets-store-csi-driver:
           branches:
             gh-pages:
@@ -681,7 +686,6 @@ tide:
     - do-not-merge/invalid-owners-file
     - do-not-merge/release-note-label-needed
     - do-not-merge/work-in-progress
-    - needs-rebase
   - repos:
     - kubernetes/kubernetes
     labels:
@@ -700,7 +704,6 @@ tide:
     - do-not-merge/needs-sig
     - do-not-merge/release-note-label-needed
     - do-not-merge/work-in-progress
-    - needs-rebase
   - author: k8s-ci-robot
     labels: # k8s-ci-robot should only create autobump PR with this label
     - skip-review
@@ -714,7 +717,6 @@ tide:
     - do-not-merge/invalid-owners-file
     - do-not-merge/release-note-label-needed
     - do-not-merge/work-in-progress
-    - needs-rebase
     repos:
     - kubernetes/test-infra
   - author: k8s-infra-ci-robot
@@ -730,7 +732,6 @@ tide:
     - do-not-merge/invalid-owners-file
     - do-not-merge/release-note-label-needed
     - do-not-merge/work-in-progress
-    - needs-rebase
     repos:
     - kubernetes/k8s.io
     - kubernetes/test-infra
@@ -752,7 +753,6 @@ tide:
     - do-not-merge/needs-sig
     - do-not-merge/release-note-label-needed
     - do-not-merge/work-in-progress
-    - needs-rebase
     - needs-kind
   - repos:
     - kubernetes-sigs/cluster-api
@@ -770,17 +770,18 @@ tide:
       - do-not-merge/needs-area
       - do-not-merge/release-note-label-needed
       - do-not-merge/work-in-progress
-      - needs-rebase
   merge_method:
     kubernetes-client/csharp: squash
     kubernetes-client/gen: squash
     kubernetes-sigs/cluster-api-provider-digitalocean: squash
     kubernetes-sigs/cluster-api-provider-ibmcloud: squash
     kubernetes-sigs/ibm-vpc-block-csi-driver: squash
+    kubernetes-sigs/karpenter: squash
     kubernetes-sigs/kernel-module-management: squash
     kubernetes-sigs/krew-index: squash
     kubernetes-sigs/krew: squash
     kubernetes-sigs/kubespray: squash
+    kubernetes-sigs/kueue: squash
     kubernetes-sigs/kui: rebase
     kubernetes-sigs/security-profiles-operator: rebase
     kubernetes-sigs/service-catalog: squash
@@ -790,6 +791,7 @@ tide:
     kubernetes/cloud-provider-openstack: squash
     kubernetes/dashboard: squash
     kubernetes/ingress-nginx: squash
+    kubernetes-sigs/ingress2gateway: squash
   pr_status_base_urls:
     '*': https://prow.k8s.io/pr
   blocker_label: tide/merge-blocker

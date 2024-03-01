@@ -2,7 +2,7 @@ presubmits:
   kubernetes/kubernetes:
   # this replaces the bootstrap / scenario based job going forward
   - name: pull-kubernetes-integration
-    cluster: k8s-infra-prow-build
+    cluster: eks-prow-build-cluster
     always_run: true
     decorate: true
     skip_branches:
@@ -18,39 +18,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
-        command:
-        - runner.sh
-        args:
-        - ./hack/jenkins/test-dockerized.sh
-        # docker-in-docker needs privileged mode
-        securityContext:
-          privileged: true
-        resources:
-          limits:
-            cpu: 6
-            memory: 15Gi
-          requests:
-            cpu: 6
-            memory: 15Gi
-  - name: pull-kubernetes-integration-eks
-    cluster: eks-prow-build-cluster
-    always_run: false
-    optional: true
-    decorate: true
-    skip_branches:
-    - release-\d+.\d+ # per-release job
-    annotations:
-      fork-per-release: "false"
-      testgrid-dashboards: sig-testing-e2e-framework
-      testgrid-tab-name: integration-eks
-    path_alias: k8s.io/kubernetes
-    labels:
-      preset-service-account: "true"
-      preset-dind-enabled: "true"
-    spec:
-      containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         env:
@@ -87,7 +55,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         env:
@@ -121,7 +89,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-go-canary
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-go-canary
         command:
         - runner.sh
         args:
@@ -158,7 +126,7 @@ periodics:
     description: "Ends up running: make test-cmd test-integration"
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       args:

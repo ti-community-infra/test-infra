@@ -14,7 +14,7 @@ presubmits:
     - ^main$
     spec:
       containers:
-      - image: registry.k8s.io/artifact-promoter/kpromo:v4.0.4-0
+      - image: registry.k8s.io/artifact-promoter/kpromo:v4.0.5-0
         command:
         - /kpromo
         args:
@@ -45,7 +45,7 @@ presubmits:
     spec:
       serviceAccountName: k8s-infra-gcr-vuln-scanning
       containers:
-      - image: registry.k8s.io/artifact-promoter/kpromo:v4.0.4-0
+      - image: registry.k8s.io/artifact-promoter/kpromo:v4.0.5-0
         command:
         - /kpromo
         args:
@@ -78,6 +78,7 @@ presubmits:
         - name: GOPATH
           value: /go
   - name: pull-k8sio-file-promo
+    cluster: k8s-infra-prow-build
     annotations:
       testgrid-create-test-group: 'true'
       testgrid-dashboards: sig-release-releng-blocking, sig-k8s-infra-k8sio
@@ -91,17 +92,25 @@ presubmits:
     - ^main$
     spec:
       containers:
-      - image: registry.k8s.io/artifact-promoter/kpromo:v4.0.4-0
+      - image: registry.k8s.io/artifact-promoter/kpromo:v4.0.5-0
         command:
         - /kpromo
         args:
         - run
         - files
         - --manifests=/home/prow/go/src/github.com/kubernetes/k8s.io/artifacts/
+        resources:
+          limits:
+            cpu: 2
+            memory: "4Gi"
+          requests:
+            cpu: 2
+            memory: "4Gi"
   # WIP version of pull-k8sio-file-promo that adds mirroring to our replicas.
   # Adds two extra containers to dry-run miroring for staging and production mirrors.
   # TODO(justinsb): merge with pull-k8sio-file-promo once we are happy with it
   - name: pull-k8sio-file-promo-with-mirroring
+    cluster: k8s-infra-prow-build
     annotations:
       testgrid-create-test-group: 'true'
       testgrid-dashboards: sig-release-releng-blocking, sig-k8s-infra-k8sio
@@ -119,7 +128,14 @@ presubmits:
       - name: promote-to-primary
         # TODO(justinsb): replace with released image once this is working
         # Curently lacking S3 support - at least
-        image: gcr.io/k8s-staging-artifact-promoter/kpromo:v4.0.4-0
+        image: gcr.io/k8s-staging-artifact-promoter/kpromo:v4.0.5-0
+        resources:
+          limits:
+            cpu: 2
+            memory: 4Gi
+          requests:
+            cpu: 2
+            memory: 4Gi
         command:
         - /kpromo
         args:
@@ -129,7 +145,14 @@ presubmits:
       - name: promote-to-mirrors
         # TODO(justinsb): replace with released image once this is working
         # Curently lacking S3 support - at least
-        image: gcr.io/k8s-staging-artifact-promoter/kpromo:v4.0.4-0
+        image: gcr.io/k8s-staging-artifact-promoter/kpromo:v4.0.5-0
+        resources:
+          limits:
+            cpu: 2
+            memory: 4Gi
+          requests:
+            cpu: 2
+            memory: 4Gi
         command:
         - /kpromo
         args:
@@ -139,7 +162,14 @@ presubmits:
       - name: promote-to-mirrors-staging
         # TODO(justinsb): replace with released image once this is working
         # Curently lacking S3 support - at least
-        image: gcr.io/k8s-staging-artifact-promoter/kpromo:v4.0.4-0
+        image: gcr.io/k8s-staging-artifact-promoter/kpromo:v4.0.5-0
+        resources:
+          limits:
+            cpu: 2
+            memory: 4Gi
+          requests:
+            cpu: 2
+            memory: 4Gi
         command:
         - /kpromo
         args:

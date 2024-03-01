@@ -2,7 +2,7 @@
 gitHubLogin: "k8s-infra-ci-robot"
 gitHubToken: "/etc/github-token/token"
 gitName: "Kubernetes Prow Robot"
-gitEmail: "k8s-infra-ci-robot@kubernetes.io"
+gitEmail: "75457971+k8s-infra-ci-robot@users.noreply.github.com"
 onCallAddress: "https://storage.googleapis.com/kubernetes-jenkins/oncall.json"
 skipPullRequest: false
 gitHubOrg: "kubernetes"
@@ -29,8 +29,13 @@ prefixes:
     repo: "https://github.com/kubernetes/test-infra"
     summarise: false
     consistentImages: false
-  - name: "k8s-staging-test-infra images"
+  - name: "k8s-staging-test-infra GCR images"
     prefix: "gcr.io/k8s-staging-test-infra"
+    repo: "https://github.com/kubernetes/test-infra"
+    summarise: false
+    consistentImages: false
+  - name: "k8s-staging-test-infra AR images"
+    prefix: "us-central1-docker.pkg.dev/k8s-staging-test-infra/images"
     repo: "https://github.com/kubernetes/test-infra"
     summarise: false
     consistentImages: false

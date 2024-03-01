@@ -28,7 +28,7 @@ periodics:
     testgrid-tab-name: node-throughput
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -89,7 +89,7 @@ periodics:
     testgrid-tab-name: node-containerd-throughput
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -154,14 +154,14 @@ periodics:
     testgrid-num-failures-to-alert: '2'
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
       args:
       - --cluster=kubemark-100
       - --extract=ci/latest
-      - --gcp-master-size=n1-standard-2
+      - --gcp-master-size=n2-standard-2
       - --gcp-node-image=gci
       - --gcp-node-size=e2-standard-4
       - --gcp-nodes=4
@@ -169,6 +169,7 @@ periodics:
       - --gcp-zone=us-east1-b
       - --kubemark
       - --kubemark-nodes=100
+      - --kubemark-master-size=n2-standard-8
       - --provider=gce
       - --metadata-sources=cl2-metadata.json
       - --env=KUBEMARK_APISERVER_TEST_ARGS=--max-requests-inflight=80 --max-mutating-requests-inflight=0 --profiling --contention-profiling
@@ -232,14 +233,14 @@ periodics:
     testgrid-num-failures-to-alert: '1'
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
       args:
       - --cluster=kubemark-100
       - --extract=ci/latest
-      - --gcp-master-size=n1-standard-2
+      - --gcp-master-size=n2-standard-2
       - --gcp-node-image=gci
       - --gcp-node-size=e2-standard-4
       - --gcp-nodes=4
@@ -247,6 +248,7 @@ periodics:
       - --gcp-zone=us-east1-b
       - --kubemark
       - --kubemark-nodes=100
+      - --kubemark-master-size=n2-standard-8
       - --provider=gce
       - --metadata-sources=cl2-metadata.json
       - --test=false
@@ -272,12 +274,13 @@ periodics:
       resources:
         requests:
           cpu: 2
-          memory: "2Gi"
+          memory: "6Gi"
         limits:
           cpu: 2
-          memory: "2Gi"
+          memory: "6Gi"
 
 - name: ci-kubernetes-kubemark-100-gce-scheduler-highqps
+  cluster: k8s-infra-prow-build
   tags:
   - "perfDashPrefix: kubemark-100Nodes-scheduler-highqps"
   - "perfDashJobType: performance"
@@ -307,14 +310,14 @@ periodics:
     testgrid-num-failures-to-alert: '1'
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
       args:
       - --cluster=kubemark-100-scheduler-highqps
       - --extract=ci/latest
-      - --gcp-master-size=n1-standard-2
+      - --gcp-master-size=n2-standard-2
       - --gcp-node-image=gci
       - --gcp-node-size=e2-standard-4
       - --gcp-nodes=4
@@ -322,6 +325,7 @@ periodics:
       - --gcp-zone=us-east1-b
       - --kubemark
       - --kubemark-nodes=100
+      - --kubemark-master-size=n2-standard-8
       - --provider=gce
       - --metadata-sources=cl2-metadata.json
       - --env=KUBEMARK_APISERVER_TEST_ARGS=--max-requests-inflight=80 --max-mutating-requests-inflight=0 --profiling --contention-profiling
@@ -341,18 +345,16 @@ periodics:
       - --test-cmd-args=--testoverrides=./testing/experiments/use_simple_latency_query.yaml
       - --test-cmd-name=ClusterLoaderV2
       - --timeout=150m
-      - --use-logexporter
-      - --logexporter-gcs-path=gs://sig-scalability-logs/$(JOB_NAME)/$(BUILD_ID)
       # docker-in-docker needs privileged mode
       securityContext:
         privileged: true
       resources:
         requests:
           cpu: 2
-          memory: "2Gi"
+          memory: "6Gi"
         limits:
           cpu: 2
-          memory: "2Gi"
+          memory: "6Gi"
 
 - name: ci-kubernetes-kubemark-500-gce
   cluster: k8s-infra-prow-build
@@ -390,14 +392,14 @@ periodics:
     testgrid-num-failures-to-alert: '2'
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
       args:
       - --cluster=kubemark-500
       - --extract=ci/latest
-      - --gcp-master-size=n1-standard-4
+      - --gcp-master-size=n2-standard-4
       - --gcp-node-image=gci
       - --gcp-node-size=e2-standard-8
       - --gcp-nodes=8
@@ -405,6 +407,7 @@ periodics:
       - --gcp-zone=us-central1-f
       - --kubemark
       - --kubemark-nodes=500
+      - --kubemark-master-size=n2-standard-16
       - --metadata-sources=cl2-metadata.json
       - --env=KUBEMARK_APISERVER_TEST_ARGS=--max-requests-inflight=160 --max-mutating-requests-inflight=0 --profiling --contention-profiling
       - --provider=gce
@@ -471,7 +474,7 @@ periodics:
     testgrid-num-columns-recent: '3'
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -480,11 +483,13 @@ periodics:
       - --extract=ci/latest
       - --gcp-node-image=gci
       - --gcp-node-size=e2-standard-8
+      - --gcp-master-size=n2-standard-64
       - --gcp-nodes=84
       - --gcp-project-type=scalability-project
       - --gcp-zone=us-east1-b
       - --kubemark
       - --kubemark-nodes=5000
+      - --kubemark-master-size=n2-standard-64
       - --provider=gce
       - --metadata-sources=cl2-metadata.json
       # With APF only sum of --max-requests-inflight and --max-mutating-requests-inflight matters, so set --max-mutating-requests-inflight to 0.
@@ -557,7 +562,7 @@ periodics:
     testgrid-num-columns-recent: '3'
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -566,11 +571,13 @@ periodics:
       - --extract=ci/latest
       - --gcp-node-image=gci
       - --gcp-node-size=e2-standard-8
+      - --gcp-master-size=n2-standard-2
       - --gcp-nodes=84
       - --gcp-project-type=scalability-project
       - --gcp-zone=us-east1-b
       - --kubemark
       - --kubemark-nodes=5000
+      - --kubemark-master-size=n2-standard-64
       - --provider=gce
       - --metadata-sources=cl2-metadata.json
       - --test=false
@@ -632,7 +639,7 @@ periodics:
     testgrid-num-failures-to-alert: '1'
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -641,11 +648,12 @@ periodics:
       - --extract=ci/latest
       - --gcp-node-image=gci
       - --gcp-node-size=e2-standard-8
+      - --gcp-master-size=n2-standard-2
       - --gcp-nodes=9
       - --gcp-project-type=scalability-project
       - --gcp-zone=us-east1-b
       - --kubemark
-      - --kubemark-master-size=n1-standard-32
+      - --kubemark-master-size=n2-standard-32
       - --kubemark-nodes=600
       - --provider=gce
       - --metadata-sources=cl2-metadata.json
@@ -697,7 +705,7 @@ periodics:
     testgrid-tab-name: kubemark-100-benchmark
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       args:
@@ -729,7 +737,7 @@ periodics:
     timeout: 2h25m
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - ./hack/jenkins/benchmark-dockerized.sh
       args:
@@ -783,7 +791,7 @@ periodics:
     testgrid-tab-name: kube-dns
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -838,7 +846,7 @@ periodics:
     testgrid-tab-name: node-local-dns
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -882,16 +890,25 @@ periodics:
   annotations:
     testgrid-dashboards: sig-scalability-network
     testgrid-tab-name: metric-measurement
+  decorate: true
+  decoration_config:
+    timeout: 60m
+  extra_refs:
+  - org: kubernetes
+    repo: kubernetes
+    base_ref: master
+    path_alias: k8s.io/kubernetes
+  - org: kubernetes
+    repo: perf-tests
+    base_ref: master
+    path_alias: k8s.io/perf-tests
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
+      command:
+      - runner.sh
+      - /workspace/scenarios/kubernetes_e2e.py
       args:
-      - --repo=k8s.io/kubernetes=master
-      - --repo=k8s.io/perf-tests=master
-      - --root=/go/src
-      - --timeout=60
-      - --scenario=kubernetes_e2e
-      - --
       - --check-leaked-resources
       - --cluster=
       - --extract=ci/latest
@@ -942,7 +959,7 @@ periodics:
     testgrid-tab-name: gce-benchmark-requests-1
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - /workspace/scenarios/kubernetes_e2e.py
@@ -955,7 +972,7 @@ periodics:
       - --env=CL2_BENCHMARK_INFLIGHT=1
       - --env=CL2_BENCHMARK_URI=/api/v1/namespaces/%namespace%/configmaps/benchmark-config-map-0?resourceVersion=0
       - --extract=ci/latest
-      - --gcp-master-size=n1-standard-96
+      - --gcp-master-size=n2-standard-96
       - --gcp-node-image=gci
       - --gcp-node-size=e2-standard-8
       - --gcp-nodes=1

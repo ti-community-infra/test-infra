@@ -422,6 +422,153 @@ func TestGetGCSBrowserPrefix(t *testing.T) {
 	}
 }
 
+func TestDefaultMatches(t *testing.T) {
+	for _, tc := range []struct{
+		desc string
+		givenOrgRepo string
+		givenCluster string
+		orgRepo string
+		cluster string
+		want bool
+	}{
+		{
+			desc: "empty",
+			orgRepo: "org/repo",
+			cluster: "cluster",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo empty",
+			givenOrgRepo: "",
+			orgRepo: "org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo star",
+			givenOrgRepo: "*",
+			orgRepo: "org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo org match",
+			givenOrgRepo: "org",
+			orgRepo: "org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo full match",
+			givenOrgRepo: "org/repo",
+			orgRepo: "org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo gerrit review org match",
+			givenOrgRepo: "some.org",
+			orgRepo: "some-review.org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo gerrit review full match",
+			givenOrgRepo: "some.org/repo",
+			orgRepo: "some-review.org/repo",
+			want: true,
+		},
+		// The following two cases cover an unexpected existing configuration
+		// that matches a literal http/s prefix. Though unadvised, it should
+		// not be broken by fuzz matching http prefixes.
+		{
+			desc: "givenOrgRepo http full match",
+			givenOrgRepo: "http://org/repo",
+			orgRepo: "http://org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo https full match",
+			givenOrgRepo: "https://org/repo",
+			orgRepo: "https://org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo http fuzz org match",
+			givenOrgRepo: "org",
+			orgRepo: "http://org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo https fuzz org match",
+			givenOrgRepo: "org",
+			orgRepo: "https://org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo https fuzz gerrit review org match",
+			givenOrgRepo: "some.org",
+			orgRepo: "https://some-review.org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo http fuzz full match",
+			givenOrgRepo: "org/repo",
+			orgRepo: "http://org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo https fuzz full match",
+			givenOrgRepo: "org/repo",
+			orgRepo: "https://org/repo",
+			want: true,
+		},
+		{
+			desc: "givenOrgRepo org mismatch",
+			givenOrgRepo: "org2",
+			orgRepo: "org/repo",
+			want: false,
+		},
+		{
+			desc: "givenOrgRepo repo mismatch",
+			givenOrgRepo: "org/repo2",
+			orgRepo: "org/repo",
+			want: false,
+		},
+		{
+			desc: "givenOrgRepo gerrit review org mismatch",
+			givenOrgRepo: "some.other.org",
+			orgRepo: "some.other-review.org",
+			want: false,
+		},
+		{
+			desc: "givenCluster empty",
+			givenCluster: "",
+			cluster: "cluster",
+			want: true,
+		},
+		{
+			desc: "givenCluster star",
+			givenCluster: "*",
+			cluster: "cluster",
+			want: true,
+		},
+		{
+			desc: "givenCluster match",
+			givenCluster: "cluster",
+			cluster: "cluster",
+			want: true,
+		},
+		{
+			desc: "givenCluster mismatch",
+			givenCluster: "cluster2",
+			cluster: "cluster",
+			want: false,
+		},
+	}{
+		t.Run(tc.desc, func(t *testing.T) {
+			if got := matches(tc.givenOrgRepo, tc.givenCluster, tc.orgRepo, tc.cluster); got != tc.want {
+				t.Errorf("matches() got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestDecorationRawYaml(t *testing.T) {
 	t.Parallel()
 	var testCases = []struct {
@@ -1139,6 +1286,64 @@ gerrit:
 			}
 
 			if d := cmp.Diff(tc.expected, cfg.Gerrit, cmpopts.EquateEmpty(), cmpopts.IgnoreFields(Gerrit{}, "AllowedPresubmitTriggerRe")); d != "" {
+				t.Errorf("got d: %s", d)
+			}
+		})
+	}
+}
+
+func TestDisabledClustersRawYaml(t *testing.T) {
+	t.Parallel()
+	var testCases = []struct {
+		name        string
+		expectError bool
+		rawConfig   string
+		expected    []string
+	}{
+		{
+			name:        "default value",
+			expectError: false,
+			rawConfig:   `a: b`,
+		},
+		{
+			name:        "basic case",
+			expectError: false,
+			rawConfig: `disabled_clusters:
+- build01
+- build08
+`,
+			expected: []string{"build01", "build08"},
+		},
+		{
+			name:        "duplicates without ordering",
+			expectError: false,
+			rawConfig: `disabled_clusters:
+- build08
+- build08
+- build01
+`,
+			expected: []string{"build08", "build08", "build01"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// save the config
+			prowConfigDir := t.TempDir()
+
+			prowConfig := filepath.Join(prowConfigDir, "config.yaml")
+			if err := os.WriteFile(prowConfig, []byte(tc.rawConfig), 0666); err != nil {
+				t.Fatalf("fail to write prow config: %v", err)
+			}
+
+			cfg, err := Load(prowConfig, "", nil, "")
+			if tc.expectError && err == nil {
+				t.Errorf("tc %s: Expect error, but got nil", tc.name)
+			} else if !tc.expectError && err != nil {
+				t.Fatalf("tc %s: Expect no error, but got error %v", tc.name, err)
+			}
+
+			if d := cmp.Diff(tc.expected, cfg.DisabledClusters); d != "" {
 				t.Errorf("got d: %s", d)
 			}
 		})
@@ -7472,7 +7677,7 @@ func TestGetProwYAMLDoesNotCallRefGettersWhenInrepoconfigIsDisabled(t *testing.T
 	}
 
 	c := &Config{}
-	if _, err := c.getProwYAMLWithDefaults(nil, "test", baseSHAGetter, headSHAGetter); err != nil {
+	if _, err := c.getProwYAMLWithDefaults(nil, "test", "main", baseSHAGetter, headSHAGetter); err != nil {
 		t.Fatalf("error calling GetProwYAML: %v", err)
 	}
 	if baseSHAGetterCalled {
@@ -7509,7 +7714,7 @@ func TestGetPresubmitsReturnsStaticAndInrepoconfigPresubmits(t *testing.T) {
 		},
 	}
 
-	presubmits, err := c.GetPresubmits(nil, org+"/"+repo, func() (string, error) { return "", nil })
+	presubmits, err := c.GetPresubmits(nil, org+"/"+repo, "main", func() (string, error) { return "", nil })
 	if err != nil {
 		t.Fatalf("Error calling GetPresubmits: %v", err)
 	}
@@ -7547,7 +7752,7 @@ func TestGetPostsubmitsReturnsStaticAndInrepoconfigPostsubmits(t *testing.T) {
 		},
 	}
 
-	postsubmits, err := c.GetPostsubmits(nil, org+"/"+repo, func() (string, error) { return "", nil })
+	postsubmits, err := c.GetPostsubmits(nil, org+"/"+repo, "main", func() (string, error) { return "", nil })
 	if err != nil {
 		t.Fatalf("Error calling GetPostsubmits: %v", err)
 	}
@@ -7803,7 +8008,7 @@ func TestValidatePresubmits(t *testing.T) {
 				{JobBase: JobBase{Name: "a"}, Reporter: Reporter{Context: "foo"}},
 				{JobBase: JobBase{Name: "a"}, Reporter: Reporter{Context: "bar"}},
 			},
-			expectedError: "duplicated presubmit job: a",
+			expectedError: "duplicated presubmit jobs (consider both inrepo and central config): [a]",
 		},
 		{
 			name: "Duplicate jobname on different branches doesn't cause error",
@@ -7902,7 +8107,7 @@ func TestValidatePostsubmits(t *testing.T) {
 				{JobBase: JobBase{Name: "a"}, Reporter: Reporter{Context: "foo"}},
 				{JobBase: JobBase{Name: "a"}, Reporter: Reporter{Context: "bar"}},
 			},
-			expectedError: "duplicated postsubmit job: a",
+			expectedError: "duplicated postsubmit jobs (consider both inrepo and central config): [a]",
 		},
 		{
 			name:          "Invalid JobBase causes error",
@@ -8205,6 +8410,8 @@ log_level: info
 managed_webhooks:
   auto_accept_invitation: false
   respect_legacy_global_token: false
+moonraker:
+  client_timeout: 10m0s
 plank:
   max_goroutines: 20
   pod_pending_timeout: 10m0s
@@ -8286,6 +8493,8 @@ log_level: info
 managed_webhooks:
   auto_accept_invitation: false
   respect_legacy_global_token: false
+moonraker:
+  client_timeout: 10m0s
 plank:
   max_goroutines: 20
   pod_pending_timeout: 10m0s
@@ -8360,6 +8569,8 @@ log_level: info
 managed_webhooks:
   auto_accept_invitation: false
   respect_legacy_global_token: false
+moonraker:
+  client_timeout: 10m0s
 plank:
   max_goroutines: 20
   pod_pending_timeout: 10m0s
@@ -8439,6 +8650,8 @@ log_level: info
 managed_webhooks:
   auto_accept_invitation: false
   respect_legacy_global_token: false
+moonraker:
+  client_timeout: 10m0s
 plank:
   max_goroutines: 20
   pod_pending_timeout: 10m0s

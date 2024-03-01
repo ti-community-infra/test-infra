@@ -29,6 +29,7 @@ import (
 	prowcrd "k8s.io/test-infra/prow/apis/prowjobs/v1"
 	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/gangway"
+	"k8s.io/test-infra/prow/kube"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -81,11 +82,11 @@ func (pe *ProwJobEvent) ToMessageOfType(t string) (*pubsub.Message, error) {
 // validates them using Prow Configuration and
 // use a ProwJobClient to create Prow Jobs.
 type Subscriber struct {
-	ConfigAgent       *config.Agent
-	Metrics           *Metrics
-	ProwJobClient     gangway.ProwJobClient
-	Reporter          reportClient
-	InRepoConfigCache *config.InRepoConfigCache
+	ConfigAgent        *config.Agent
+	Metrics            *Metrics
+	ProwJobClient      gangway.ProwJobClient
+	Reporter           reportClient
+	InRepoConfigGetter config.InRepoConfigGetter
 }
 
 type messageInterface interface {
@@ -165,7 +166,7 @@ func (s *Subscriber) handleMessage(msg messageInterface, subscription string, al
 	var allowedApiClient *config.AllowedApiClient = nil
 	var requireTenantID bool = false
 
-	if _, err = gangway.HandleProwJob(l, s.getReporterFunc(l), cjer, s.ProwJobClient, s.ConfigAgent.Config(), s.InRepoConfigCache, allowedApiClient, requireTenantID, allowedClusters); err != nil {
+	if _, err = gangway.HandleProwJob(l, s.getReporterFunc(l), cjer, s.ProwJobClient, s.ConfigAgent.Config(), s.InRepoConfigGetter, allowedApiClient, requireTenantID, allowedClusters); err != nil {
 		l.WithError(err).Info("failed to create Prow Job")
 		s.Metrics.ErrorCounter.With(prometheus.Labels{
 			subscriptionLabel: subscription,
@@ -265,6 +266,13 @@ func (s *Subscriber) peToCjer(l *logrus.Entry, pe *ProwJobEvent, eType, subscrip
 		cjer.Refs, err = gangway.FromCrdRefs(pe.Refs)
 		if err != nil {
 			return nil, err
+		}
+
+		// Add "https://" prefix to orgRepo if this is a gerrit job.
+		// (Unfortunately gerrit jobs use the full repo URL as the identifier.)
+		prefix := "https://"
+		if pso.Labels[kube.GerritRevision] != "" && !strings.HasPrefix(cjer.Refs.Org, prefix) {
+			cjer.Refs.Org = prefix + cjer.Refs.Org
 		}
 	}
 

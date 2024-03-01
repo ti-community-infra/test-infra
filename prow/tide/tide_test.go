@@ -1005,10 +1005,6 @@ func TestDividePool(t *testing.T) {
 	}
 }
 
-func TestPickBatch(t *testing.T) {
-	testPickBatch(localgit.New, t)
-}
-
 func TestPickBatchV2(t *testing.T) {
 	testPickBatch(localgit.NewV2, t)
 }
@@ -1409,10 +1405,6 @@ func TestRebaseMergeMethodIsAllowed(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestTakeAction(t *testing.T) {
-	testTakeAction(localgit.New, t)
 }
 
 func TestTakeActionV2(t *testing.T) {
@@ -2896,8 +2888,10 @@ func TestPresubmitsByPull(t *testing.T) {
 		prs                []CodeReviewCommon
 		prowYAMLGetter     config.ProwYAMLGetter
 
-		expectedPresubmits  map[int][]config.Presubmit
-		expectedChangeCache map[changeCacheKey][]string
+		expectedPresubmits           map[int][]config.Presubmit
+		expectedChangeCache          map[changeCacheKey][]string
+		requireManuallyTriggeredJobs bool
+		fromBranchProtection         bool
 	}{
 		{
 			name: "no matching presubmits",
@@ -3049,6 +3043,41 @@ func TestPresubmitsByPull(t *testing.T) {
 			}}},
 		},
 		{
+			name: "runs manual triggered jobs (requireManuallyTriggeredJobs enabled)",
+			presubmits: []config.Presubmit{
+				{
+					Reporter:  config.Reporter{Context: "presubmit"},
+					AlwaysRun: false,
+					Brancher: config.Brancher{
+						Branches: []string{defaultBranch, "dev"},
+					},
+				},
+			},
+			requireManuallyTriggeredJobs: true,
+			fromBranchProtection:         true,
+			expectedPresubmits: map[int][]config.Presubmit{100: {{
+				Reporter:  config.Reporter{Context: "presubmit"},
+				AlwaysRun: false,
+				Brancher: config.Brancher{
+					Branches: []string{defaultBranch, "dev"},
+				},
+			}}},
+		},
+		{
+			name: "doesn't run manual triggered jobs (requireManuallyTriggeredJobs disabled)",
+			presubmits: []config.Presubmit{
+				{
+					Reporter:  config.Reporter{Context: "presubmit"},
+					AlwaysRun: false,
+					Brancher: config.Brancher{
+						Branches: []string{defaultBranch, "dev"},
+					},
+				},
+			},
+			fromBranchProtection: true,
+			expectedPresubmits:   map[int][]config.Presubmit{},
+		},
+		{
 			name: "brancher-not-match-when-tide-wants-it",
 			presubmits: []config.Presubmit{
 				{
@@ -3176,7 +3205,7 @@ func TestPresubmitsByPull(t *testing.T) {
 				AlwaysRun: true,
 				Reporter:  config.Reporter{Context: "always"},
 			}},
-			prowYAMLGetter: func(_ *config.Config, _ git.ClientFactory, _, _ string, headRefs ...string) (*config.ProwYAML, error) {
+			prowYAMLGetter: func(_ *config.Config, _ git.ClientFactory, _, _, _ string, headRefs ...string) (*config.ProwYAML, error) {
 				if len(headRefs) == 1 && headRefs[0] == "1" {
 					return nil, errors.New("you shall not get jobs")
 				}
@@ -3203,7 +3232,25 @@ func TestPresubmitsByPull(t *testing.T) {
 				tc.expectedChangeCache = map[changeCacheKey][]string{}
 			}
 
-			cfg := &config.Config{}
+			cfg := &config.Config{
+				ProwConfig: config.ProwConfig{
+					BranchProtection: config.BranchProtection{
+						Policy: config.Policy{
+							RequireManuallyTriggeredJobs: &tc.requireManuallyTriggeredJobs,
+						},
+					},
+					Tide: config.Tide{
+						TideGitHubConfig: config.TideGitHubConfig{
+							ContextOptions: config.TideContextPolicyOptions{
+								TideContextPolicy: config.TideContextPolicy{
+									FromBranchProtection: &tc.fromBranchProtection,
+								},
+							},
+						},
+					},
+				},
+			}
+
 			cfg.SetPresubmits(map[string][]config.Presubmit{
 				"/":       tc.presubmits,
 				"foo/bar": {{Reporter: config.Reporter{Context: "wrong-repo"}, AlwaysRun: true}},
@@ -3577,12 +3624,14 @@ func TestAccumulateReturnsCorrectMissingTests(t *testing.T) {
 
 func TestPresubmitsForBatch(t *testing.T) {
 	testCases := []struct {
-		name           string
-		prs            []CodeReviewCommon
-		changedFiles   *changedFilesAgent
-		jobs           []config.Presubmit
-		prowYAMLGetter config.ProwYAMLGetter
-		expected       []config.Presubmit
+		name                         string
+		prs                          []CodeReviewCommon
+		changedFiles                 *changedFilesAgent
+		jobs                         []config.Presubmit
+		prowYAMLGetter               config.ProwYAMLGetter
+		expected                     []config.Presubmit
+		requireManuallyTriggeredJobs bool
+		fromBranchProtection         bool
 	}{
 		{
 			name: "All jobs get picked",
@@ -3612,6 +3661,46 @@ func TestPresubmitsForBatch(t *testing.T) {
 		},
 		{
 			name: "Optional jobs are excluded",
+			prs:  []CodeReviewCommon{*CodeReviewCommonFromPullRequest(getPR("org", "repo", 1))},
+			jobs: []config.Presubmit{
+				{
+					AlwaysRun: true,
+					Reporter:  config.Reporter{Context: "foo"},
+				},
+				{
+					Reporter: config.Reporter{Context: "bar"},
+				},
+			},
+			expected: []config.Presubmit{{
+				AlwaysRun: true,
+				Reporter:  config.Reporter{Context: "foo"},
+			}},
+		},
+		{
+			name:                         "jobs that require manual trigger included with branch protection enabled",
+			prs:                          []CodeReviewCommon{*CodeReviewCommonFromPullRequest(getPR("org", "repo", 1))},
+			requireManuallyTriggeredJobs: true,
+			fromBranchProtection:         true,
+			jobs: []config.Presubmit{
+				{
+					AlwaysRun: true,
+					Reporter:  config.Reporter{Context: "foo"},
+				},
+				{
+					Reporter: config.Reporter{Context: "bar"},
+				},
+			},
+			expected: []config.Presubmit{
+				{
+					AlwaysRun: true,
+					Reporter:  config.Reporter{Context: "foo"},
+				},
+				{
+					Reporter: config.Reporter{Context: "bar"},
+				}},
+		},
+		{
+			name: "jobs that require manual trigger excluded with branch protection disabled",
 			prs:  []CodeReviewCommon{*CodeReviewCommonFromPullRequest(getPR("org", "repo", 1))},
 			jobs: []config.Presubmit{
 				{
@@ -3751,6 +3840,24 @@ func TestPresubmitsForBatch(t *testing.T) {
 					},
 					ProwConfig: config.ProwConfig{
 						InRepoConfig: inrepoconfig,
+						BranchProtection: config.BranchProtection{
+							Orgs: map[string]config.Org{
+								"org": {
+									Policy: config.Policy{
+										RequireManuallyTriggeredJobs: &tc.requireManuallyTriggeredJobs,
+									},
+								},
+							},
+						},
+						Tide: config.Tide{
+							TideGitHubConfig: config.TideGitHubConfig{
+								ContextOptions: config.TideContextPolicyOptions{
+									TideContextPolicy: config.TideContextPolicy{
+										FromBranchProtection: &tc.fromBranchProtection,
+									},
+								},
+							},
+						},
 					},
 				}
 			}
@@ -4011,7 +4118,7 @@ func (c *indexingClient) List(ctx context.Context, list ctrlruntimeclient.Object
 }
 
 func prowYAMLGetterForHeadRefs(headRefsToLookFor []string, ps []config.Presubmit) config.ProwYAMLGetter {
-	return func(_ *config.Config, _ git.ClientFactory, _, _ string, headRefs ...string) (*config.ProwYAML, error) {
+	return func(_ *config.Config, _ git.ClientFactory, _, _, _ string, headRefs ...string) (*config.ProwYAML, error) {
 		if len(headRefsToLookFor) != len(headRefs) {
 			return nil, fmt.Errorf("expcted %d headrefs, got %d", len(headRefsToLookFor), len(headRefs))
 		}

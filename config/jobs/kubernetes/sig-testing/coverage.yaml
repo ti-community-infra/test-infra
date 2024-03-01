@@ -20,7 +20,7 @@ presubmits:
       description: unit test coverage presubmit
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - bash
@@ -50,6 +50,7 @@ presubmits:
 periodics:
 - interval: 1h
   name: ci-kubernetes-coverage-conformance
+  cluster: k8s-infra-prow-build
   decorate: true
   labels:
     preset-service-account: "true"
@@ -72,7 +73,7 @@ periodics:
     timeout: 6h
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - bash
@@ -105,12 +106,20 @@ periodics:
         value: "n"
       securityContext:
         privileged: true
+      resources:
+        limits:
+          cpu: 4
+          memory: 16Gi
+        requests:
+          cpu: 4
+          memory: 16Gi
   # coverage for same tests that run in ci-kubernetes-e2e-gci-gce
   annotations:
     testgrid-dashboards: sig-testing-canaries
     description: build instrumented kubernetes, run conformance tests, generate line coverage using gopherage
 - interval: 1h
   name: ci-kubernetes-coverage-e2e-gci-gce
+  cluster: k8s-infra-prow-build
   decorate: true
   labels:
     preset-service-account: "true"
@@ -133,7 +142,7 @@ periodics:
     timeout: 3h
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - bash
@@ -170,6 +179,13 @@ periodics:
         value: "n"
       securityContext:
         privileged: true
+      resources:
+        limits:
+          cpu: 4
+          memory: 16Gi
+        requests:
+          cpu: 4
+          memory: 16Gi
   annotations:
     testgrid-dashboards: sig-testing-canaries
     description: build instrumented kubernetes, run (non-slow/serial/disruptive/flaky/feature) e2e tests, generate line coverage using gopherage
@@ -189,7 +205,7 @@ periodics:
     path_alias: k8s.io/test-infra
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
       command:
       - runner.sh
       - bash

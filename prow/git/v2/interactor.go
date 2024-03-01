@@ -21,10 +21,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
-
-	"github.com/sirupsen/logrus"
+	"time"
 )
 
 // Interactor knows how to operate on a git repository cloned from GitHub
@@ -42,6 +42,9 @@ type Interactor interface {
 	Checkout(commitlike string) error
 	// RevParse runs `git rev-parse`
 	RevParse(commitlike string) (string, error)
+	// RevParseN runs `git rev-parse`, but takes a slice of git revisions, and
+	// returns a map of the git revisions as keys and the SHAs as values.
+	RevParseN(rev []string) (map[string]string, error)
 	// BranchExists determines if a branch with the name exists
 	BranchExists(branch string) bool
 	// ObjectExists determines if the Git object exists locally
@@ -80,6 +83,10 @@ type cacher interface {
 	MirrorClone() error
 	// RemoteUpdate fetches all updates from the remote.
 	RemoteUpdate() error
+	// FetchCommits fetches only the given commits.
+	FetchCommits([]string) error
+	// RetargetBranch moves the given branch to an already-existing commit.
+	RetargetBranch(string, string) error
 }
 
 // cloner knows how to clone repositories from a central cache
@@ -87,8 +94,6 @@ type cloner interface {
 	// Clone clones the repository from a local path.
 	Clone(from string) error
 	CloneWithRepoOpts(from string, repoOpts RepoOpts) error
-	// FetchCommits fetches only the given commits.
-	FetchCommits(bool, []string) error
 }
 
 // MergeOpt holds options for git merge operations.
@@ -149,7 +154,7 @@ func (i *interactor) CloneWithRepoOpts(from string, repoOpts RepoOpts) error {
 	i.logger.Infof("Creating a clone of the repo at %s from %s", i.dir, from)
 	cloneArgs := []string{"clone"}
 
-	if repoOpts.ShareObjectsWithSourceRepo {
+	if repoOpts.ShareObjectsWithPrimaryClone {
 		cloneArgs = append(cloneArgs, "--shared")
 	}
 
@@ -158,7 +163,7 @@ func (i *interactor) CloneWithRepoOpts(from string, repoOpts RepoOpts) error {
 		cloneArgs = append(cloneArgs, "--sparse")
 	}
 
-	cloneArgs = append(cloneArgs, []string{from, i.dir}...)
+	cloneArgs = append(cloneArgs, from, i.dir)
 
 	if out, err := i.executor.Run(cloneArgs...); err != nil {
 		return fmt.Errorf("error creating a clone: %w %v", err, string(out))
@@ -176,9 +181,12 @@ func (i *interactor) CloneWithRepoOpts(from string, repoOpts RepoOpts) error {
 		}
 		sparseCheckoutArgs := []string{"-C", i.dir, "sparse-checkout", "set"}
 		sparseCheckoutArgs = append(sparseCheckoutArgs, repoOpts.SparseCheckoutDirs...)
+
+		timeBeforeSparseCheckout := time.Now()
 		if out, err := i.executor.Run(sparseCheckoutArgs...); err != nil {
 			return fmt.Errorf("error setting it to a sparse checkout: %w %v", err, string(out))
 		}
+		gitMetrics.sparseCheckoutDuration.Observe(time.Since(timeBeforeSparseCheckout).Seconds())
 	}
 	return nil
 }
@@ -213,6 +221,38 @@ func (i *interactor) RevParse(commitlike string) (string, error) {
 		return "", fmt.Errorf("error parsing %q: %w %v", commitlike, err, string(out))
 	}
 	return string(out), nil
+}
+
+func (i *interactor) RevParseN(revs []string) (map[string]string, error) {
+	if len(revs) == 0 {
+		return nil, errors.New("input revs must have at least 1 element")
+	}
+
+	i.logger.Infof("Parsing revisions %q", revs)
+
+	arg := append([]string{"rev-parse"}, revs...)
+
+	out, err := i.executor.Run(arg...)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing %q: %w %v", revs, err, string(out))
+	}
+
+	ret := make(map[string]string)
+	got := strings.Split(string(out), "\n")
+
+	// We expect the length to be at least 2. This is because if we have the
+	// minimal number of elements (just 1), "got" should look like ["abcdef...",
+	// "\n"] because the trailing newline should be its own element.
+	if len(got) < 2 {
+		return nil, fmt.Errorf("expected parsed output to be at least 2 elements, got %d", len(got))
+	}
+	got = got[:len(got)-1] // Drop last element "\n".
+
+	for i, sha := range got {
+		ret[revs[i]] = sha
+	}
+
+	return ret, nil
 }
 
 // BranchExists returns true if branch exists in heads.
@@ -393,12 +433,8 @@ func (i *interactor) Am(path string) error {
 
 // FetchCommits only fetches those commits which we want, and only if they are
 // missing.
-func (i *interactor) FetchCommits(noFetchTags bool, commitSHAs []string) error {
-	fetchArgs := []string{"--no-write-fetch-head"}
-
-	if noFetchTags {
-		fetchArgs = append(fetchArgs, "--no-tags")
-	}
+func (i *interactor) FetchCommits(commitSHAs []string) error {
+	fetchArgs := []string{"--no-write-fetch-head", "--no-tags"}
 
 	// For each commit SHA, check if it already exists. If so, don't bother
 	// fetching it.
@@ -425,8 +461,31 @@ func (i *interactor) FetchCommits(noFetchTags bool, commitSHAs []string) error {
 	return nil
 }
 
+// RetargetBranch moves the given branch to an already-existing commit.
+func (i *interactor) RetargetBranch(branch, sha string) error {
+	args := []string{"branch", "-f", branch, sha}
+	if out, err := i.executor.Run(args...); err != nil {
+		return fmt.Errorf("error retargeting branch: %w %v", err, string(out))
+	}
+
+	return nil
+}
+
 // RemoteUpdate fetches all updates from the remote.
 func (i *interactor) RemoteUpdate() error {
+	// We might need to refresh the token for accessing remotes in case of GitHub App auth (ghs tokens are only valid for
+	// 1 hour, see https://github.com/kubernetes/test-infra/issues/31182).
+	// Therefore, we resolve the remote again and update the clone's remote URL with a fresh token.
+	remote, err := i.remote()
+	if err != nil {
+		return fmt.Errorf("could not resolve remote for updating: %w", err)
+	}
+
+	i.logger.Info("Setting remote URL")
+	if out, err := i.executor.Run("remote", "set-url", "origin", remote); err != nil {
+		return fmt.Errorf("error setting remote URL: %w %v", err, string(out))
+	}
+
 	i.logger.Info("Updating from remote")
 	if out, err := i.executor.Run("remote", "update", "--prune"); err != nil {
 		return fmt.Errorf("error updating: %w %v", err, string(out))

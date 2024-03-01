@@ -18,6 +18,7 @@
 - [Labels that apply to kubernetes-sigs/contributor-tweets, for both issues and PRs](#labels-that-apply-to-kubernetes-sigscontributor-tweets-for-both-issues-and-prs)
 - [Labels that apply to kubernetes-sigs/controller-runtime, for both issues and PRs](#labels-that-apply-to-kubernetes-sigscontroller-runtime-for-both-issues-and-prs)
 - [Labels that apply to kubernetes-sigs/gateway-api, only for issues](#labels-that-apply-to-kubernetes-sigsgateway-api-only-for-issues)
+- [Labels that apply to kubernetes-sigs/gateway-api, only for PRs](#labels-that-apply-to-kubernetes-sigsgateway-api-only-for-prs)
 - [Labels that apply to kubernetes-sigs/kind, for both issues and PRs](#labels-that-apply-to-kubernetes-sigskind-for-both-issues-and-prs)
 - [Labels that apply to kubernetes-sigs/krew, for both issues and PRs](#labels-that-apply-to-kubernetes-sigskrew-for-both-issues-and-prs)
 - [Labels that apply to kubernetes-sigs/promo-tools, for both issues and PRs](#labels-that-apply-to-kubernetes-sigspromo-tools-for-both-issues-and-prs)
@@ -26,6 +27,7 @@
 - [Labels that apply to kubernetes/enhancements, for both issues and PRs](#labels-that-apply-to-kubernetesenhancements-for-both-issues-and-prs)
 - [Labels that apply to kubernetes/enhancements, only for issues](#labels-that-apply-to-kubernetesenhancements-only-for-issues)
 - [Labels that apply to kubernetes/k8s.io, for both issues and PRs](#labels-that-apply-to-kubernetesk8s.io-for-both-issues-and-prs)
+- [Labels that apply to kubernetes/k8s.io, only for PRs](#labels-that-apply-to-kubernetesk8s.io-only-for-prs)
 - [Labels that apply to kubernetes/kubeadm, for both issues and PRs](#labels-that-apply-to-kuberneteskubeadm-for-both-issues-and-prs)
 - [Labels that apply to kubernetes/kubernetes, for both issues and PRs](#labels-that-apply-to-kuberneteskubernetes-for-both-issues-and-prs)
 - [Labels that apply to kubernetes/kubernetes, only for issues](#labels-that-apply-to-kuberneteskubernetes-only-for-issues)
@@ -113,6 +115,7 @@ larger set of contributors to apply/remove them.
 | <a id="sig/cluster-lifecycle" href="#sig/cluster-lifecycle">`sig/cluster-lifecycle`</a> | Categorizes an issue or PR as relevant to SIG Cluster Lifecycle.| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="sig/contributor-experience" href="#sig/contributor-experience">`sig/contributor-experience`</a> | Categorizes an issue or PR as relevant to SIG Contributor Experience.| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="sig/docs" href="#sig/docs">`sig/docs`</a> | Categorizes an issue or PR as relevant to SIG Docs.| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
+| <a id="sig/etcd" href="#sig/etcd">`sig/etcd`</a> | Categorizes an issue or PR as relevant to SIG Etcd.| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="sig/instrumentation" href="#sig/instrumentation">`sig/instrumentation`</a> | Categorizes an issue or PR as relevant to SIG Instrumentation.| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="sig/k8s-infra" href="#sig/k8s-infra">`sig/k8s-infra`</a> | Categorizes an issue or PR as relevant to SIG K8s Infra. <br><br> This was previously `wg/k8s-infra`, | anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="sig/multicluster" href="#sig/multicluster">`sig/multicluster`</a> | Categorizes an issue or PR as relevant to SIG Multicluster. <br><br> This was previously `sig/federation`, `sig/federation (deprecated - do not use)`, | anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
@@ -224,6 +227,7 @@ larger set of contributors to apply/remove them.
 | <a id="kind/design" href="#kind/design">`kind/design`</a> | Categorizes issue or PR as related to design.| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="kind/proposal" href="#kind/proposal">`kind/proposal`</a> | Issues or PRs related to proposals.| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="kind/release-blocking" href="#kind/release-blocking">`kind/release-blocking`</a> | Issues or PRs that need to be closed before the next CAPI release| approvers |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
+| <a id="triage/needs-discussion" href="#triage/needs-discussion">`triage/needs-discussion`</a> | Indicates an issue or PR that needs further discussion before being actively worked on.| org members |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 
 ## Labels that apply to kubernetes-sigs/cluster-api, only for PRs
 
@@ -307,6 +311,12 @@ larger set of contributors to apply/remove them.
 | Name | Description | Added By | Prow Plugin |
 | ---- | ----------- | -------- | --- |
 | <a id="kind/user-story" href="#kind/user-story">`kind/user-story`</a> | Categorizes an issue as capturing a user story| humans | |
+
+## Labels that apply to kubernetes-sigs/gateway-api, only for PRs
+
+| Name | Description | Added By | Prow Plugin |
+| ---- | ----------- | -------- | --- |
+| <a id="kind/gep" href="#kind/gep">`kind/gep`</a> | PRs related to Gateway Enhancement Proposal(GEP)| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 
 ## Labels that apply to kubernetes-sigs/kind, for both issues and PRs
 
@@ -396,7 +406,6 @@ larger set of contributors to apply/remove them.
 | <a id="area/apps/perfdash" href="#area/apps/perfdash">`area/apps/perfdash`</a> | perfdash.k8s.io, code in apps/perdash/| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="area/apps/prow" href="#area/apps/prow">`area/apps/prow`</a> | k8s-infra-prow.k8s.io, code in apps/prow/| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="area/apps/publishing-bot" href="#area/apps/publishing-bot">`area/apps/publishing-bot`</a> | publishing-bot, code in apps/publishing-bot/ <br><br> This was previously `area/infra/publishing-bot`, | anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
-| <a id="area/apps/sippy" href="#area/apps/sippy">`area/apps/sippy`</a> | sippy.k8s.io, code in apps/sippy/| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="area/apps/slack-infra" href="#area/apps/slack-infra">`area/apps/slack-infra`</a> | slack.k8s.io, slack-infra, code in apps/slack-infra| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="area/apps/triageparty-release" href="#area/apps/triageparty-release">`area/apps/triageparty-release`</a> | release.triage.k8s.io, triage-party, code in apps/triageparty-release| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="area/artifacts" href="#area/artifacts">`area/artifacts`</a> | Issues or PRs related to the hosting of release artifacts for subprojects| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
@@ -418,6 +427,12 @@ larger set of contributors to apply/remove them.
 | <a id="area/release-eng" href="#area/release-eng">`area/release-eng`</a> | Issues or PRs related to the Release Engineering subproject| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 | <a id="area/terraform" href="#area/terraform">`area/terraform`</a> | Terraform modules, testing them, writing more of them, code in infra/gcp/clusters/ <br><br> This was previously `area/infra/terraform`, | anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |
 
+## Labels that apply to kubernetes/k8s.io, only for PRs
+
+| Name | Description | Added By | Prow Plugin |
+| ---- | ----------- | -------- | --- |
+| <a id="skip-review" href="#skip-review">`skip-review`</a> | Indicates a PR is trusted, used by tide for auto-merging PRs.| autobump bot | |
+
 ## Labels that apply to kubernetes/kubeadm, for both issues and PRs
 
 | Name | Description | Added By | Prow Plugin |
@@ -434,6 +449,8 @@ larger set of contributors to apply/remove them.
 | <a id="area/deflake" href="#area/deflake">`area/deflake`</a> | Issues or PRs related to deflaking kubernetes tests| label | |
 | <a id="area/e2e-test-framework" href="#area/e2e-test-framework">`area/e2e-test-framework`</a> | Issues or PRs related to refactoring the kubernetes e2e test framework| label | |
 | <a id="area/network-policy" href="#area/network-policy">`area/network-policy`</a> | Issues or PRs related to Network Policy subproject| label | |
+| <a id="area/node-lifecycle" href="#area/node-lifecycle">`area/node-lifecycle`</a> | Issues or PRs related to Node lifecycle| label | |
+| <a id="area/pod-lifecycle" href="#area/pod-lifecycle">`area/pod-lifecycle`</a> | Issues or PRs related to Pod lifecycle| label | |
 | <a id="area/release-eng" href="#area/release-eng">`area/release-eng`</a> | Issues or PRs related to the Release Engineering subproject <br><br> This was previously `area/release-infra`, | label | |
 | <a id="area/stable-metrics" href="#area/stable-metrics">`area/stable-metrics`</a> | Issues or PRs involving stable metrics| label | |
 | <a id="official-cve-feed" href="#official-cve-feed">`official-cve-feed`</a> | Issues or PRs related to CVEs officially announced by Security Response Committee (SRC)| anyone |  [label](https://git.k8s.io/test-infra/prow/plugins/label) |

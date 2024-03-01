@@ -1,8 +1,6 @@
 
   - name: {{job_name}}
-    {%- if scenario == 'scalability' %}
-    cluster: eks-prow-build-cluster
-    {%- endif %}
+    cluster: {{build_cluster}}
     branches:
     - {{branch}}
     {%- if run_if_changed %}
@@ -12,6 +10,7 @@
     optional: {{optional}}
     skip_report: {{skip_report}}
     labels:
+      {%- if cloud == "aws" %}
       preset-service-account: "true"
       preset-aws-ssh: "true"
       {%- if use_preset_for_account_creds %}
@@ -20,6 +19,9 @@
       preset-aws-credential: "true"
       {%- endif %}
       preset-dind-enabled: "true"
+      {%- else %}
+      preset-k8s-ssh: "true"
+      {%- endif %}
     max_concurrency: 1
     decorate: true
     decoration_config:
@@ -33,6 +35,9 @@
       path_alias: k8s.io/perf-tests
     {%- endif %}
     spec:
+      {%- if cloud == "gce" %}
+      serviceAccountName: k8s-kops-test
+      {%- endif %}
       containers:
       - image: {{image}}
         imagePullPolicy: Always
@@ -59,10 +64,10 @@
         {%- endfor %}
         resources:
           requests:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "6"
+            memory: "16Gi"
           {%- if scenario == 'scalability' %}
           limits:
-            cpu: "2"
-            memory: "6Gi"
+            cpu: "6"
+            memory: "16Gi"
           {%- endif %}

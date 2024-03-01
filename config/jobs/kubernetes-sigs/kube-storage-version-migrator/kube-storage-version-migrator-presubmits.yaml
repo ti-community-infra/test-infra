@@ -1,19 +1,28 @@
 presubmits:
   kubernetes-sigs/kube-storage-version-migrator:
   - name: pull-kube-storage-version-migrator-test
+    cluster: eks-prow-build-cluster
     decorate: true
     always_run: true
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - make
         - test
+        resources:
+          limits:
+            cpu: 2
+            memory: 4Gi
+          requests:
+            cpu: 2
+            memory: 4Gi
 
     annotations:
       testgrid-dashboards: sig-api-machinery-kube-storage-version-migrator
       testgrid-tab-name: pr-test
   - name: pull-kube-storage-version-migrator-manually-launched-e2e
+    cluster: k8s-infra-prow-build
     decorate: true
     always_run: true
     labels:
@@ -22,7 +31,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
@@ -42,10 +51,18 @@ presubmits:
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
+        resources:
+          requests:
+            memory: 6Gi
+            cpu: 2
+          limits:
+            memory: 6Gi
+            cpu: 2
     annotations:
       testgrid-dashboards: sig-api-machinery-kube-storage-version-migrator
       testgrid-tab-name: pr-e2e-manually-launched
   - name: pull-kube-storage-version-migrator-fully-automated-e2e
+    cluster: k8s-infra-prow-build
     decorate: true
     always_run: true
     labels:
@@ -54,7 +71,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
@@ -75,10 +92,18 @@ presubmits:
         # docker-in-docker needs privileged mode
         securityContext:
           privileged: true
+        resources:
+          requests:
+            memory: 6Gi
+            cpu: 2
+          limits:
+            memory: 6Gi
+            cpu: 2
     annotations:
       testgrid-dashboards: sig-api-machinery-kube-storage-version-migrator
       testgrid-tab-name: pr-e2e-fully-automated
   - name: pull-kube-storage-version-migrator-ha-master
+    cluster: eks-prow-build-cluster
     path_alias: "sigs.k8s.io/kube-storage-version-migrator"
     decorate: true
     decoration_config:
@@ -99,7 +124,7 @@ presubmits:
       preset-kind-volume-mounts: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - "../../k8s.io/kubeadm/kinder/ci/kinder-run.sh"
@@ -110,8 +135,11 @@ presubmits:
           privileged: true
         resources:
           requests:
-            memory: "9000Mi"
-            cpu: 2000m
+            memory: 6Gi
+            cpu: 2
+          limits:
+            memory: 6Gi
+            cpu: 2
     annotations:
       testgrid-dashboards: sig-api-machinery-kube-storage-version-migrator
       testgrid-tab-name: pr-e2e-ha-master

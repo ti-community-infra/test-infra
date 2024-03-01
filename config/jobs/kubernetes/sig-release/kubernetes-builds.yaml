@@ -6,11 +6,12 @@ presubmits:
     run_if_changed: '(^.go-version)|(^build/build-image/)|(^hack/lib/golang.sh)|(^build/common.sh)'
     cluster: eks-prow-build-cluster
     decorate: true
+    path_alias: k8s.io/kubernetes
     labels:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/bootstrap:v20230316-ac3134cff2
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         args:
@@ -51,7 +52,7 @@ periodics:
       - /krel
       - ci-build
       - --configure-docker
-      - --allow-dup
+      - --allow-dup=false
       - --bucket=k8s-release-dev
       - --registry=gcr.io/k8s-staging-ci-images
       - --extra-version-markers=k8s-master
@@ -96,7 +97,7 @@ periodics:
       - /krel
       - ci-build
       - --configure-docker
-      - --allow-dup
+      - --allow-dup=false
       - --fast
       - --bucket=k8s-release-dev
       # docker-in-docker needs privileged mode
@@ -118,59 +119,3 @@ periodics:
     testgrid-tab-name: build-master-fast
     testgrid-alert-email: release-managers+alerts@kubernetes.io, release-team@kubernetes.io
     description: 'Ends up running: make quick-release'
-
-- interval: 4h
-  name: ci-release-build-packages-debs
-  cluster: eks-prow-build-cluster
-  decorate: true
-  spec:
-    containers:
-    - image: gcr.io/k8s-staging-releng/kubepkg:latest
-      imagePullPolicy: Always
-      command:
-      - ./kubepkg
-      args:
-      - debs
-      resources:
-        limits:
-          cpu: 4
-          memory: "8Gi"
-        requests:
-          cpu: 4
-          memory: "8Gi"
-  rerun_auth_config:
-    github_team_slugs:
-      - org: kubernetes
-        slug: release-managers
-  annotations:
-    testgrid-alert-email: release-managers+alerts@kubernetes.io
-    testgrid-dashboards: sig-release-releng-informing
-    testgrid-tab-name: build-packages-debs
-
-- interval: 4h
-  name: ci-release-build-packages-rpms
-  cluster: eks-prow-build-cluster
-  decorate: true
-  spec:
-    containers:
-    - image: gcr.io/k8s-staging-releng/kubepkg-rpm:latest
-      imagePullPolicy: Always
-      command:
-      - ./kubepkg
-      args:
-      - rpms
-      resources:
-        limits:
-          cpu: 4
-          memory: "8Gi"
-        requests:
-          cpu: 4
-          memory: "8Gi"
-  rerun_auth_config:
-    github_team_slugs:
-      - org: kubernetes
-        slug: release-managers
-  annotations:
-    testgrid-alert-email: release-managers+alerts@kubernetes.io
-    testgrid-dashboards: sig-release-releng-informing
-    testgrid-tab-name: build-packages-rpms
