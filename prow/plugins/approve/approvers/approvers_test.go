@@ -838,7 +838,7 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 	want = `[APPROVALNOTIFIER] This PR is **NOT APPROVED**
 
 This pull-request has been approved by: *<a href="REFERENCE" title="Approved">Bill</a>*
-**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [bob](https://github.com/bob) for approval, **ensuring that each of them provides their approval before proceeding**. For more information see [the Kubernetes Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
+**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [bob](https://github.com/bob) for approval, **ensuring that each of them provides their approval before proceeding**. For more information see [the Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
 
 *No associated issue*. Update pull-request body to add a reference to an issue, or get approval with ` + "`/approve no-issue`" + `
 
@@ -861,8 +861,6 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 		t.Errorf("GetMessage() = %+v, want = %+v", *got, want)
 	}
 }
-
-
 
 func TestGetMessageMDSuggestedCCAssignedCC(t *testing.T) {
 	linkURL, _ := url.Parse("https://github.com")
@@ -889,7 +887,7 @@ func TestGetMessageMDSuggestedCCAssignedCC(t *testing.T) {
 	// ap.AddApprover("Bill", "REFERENCE", false)
 	ap.AddAssignees("Cathy")
 	ap.AddAssignees("Diana")
-	
+
 	fmt.Println(len(ap.SuggestedCCs()))
 	fmt.Println(len(ap.AssignedCCs()))
 
@@ -925,7 +923,6 @@ func TestGetMessageMDSuggestedCCNoAssignedCC(t *testing.T) {
 
 	ap.RequireIssue = true
 	ap.AddApprover("Bill", "REFERENCE", false)
-
 
 	expectedOutput := "**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [cathy](https://github.com/cathy), [diana](https://github.com/diana) for approval, **ensuring that each of them provides their approval before proceeding**."
 
@@ -963,7 +960,6 @@ func TestGetMessageNoSuggestedCCMDAssignedCC(t *testing.T) {
 	ap.AddAssignees("Cathy")
 	ap.AddAssignees("Diana")
 
-
 	expectedOutput := "**Once this PR has been reviewed and has the lgtm label**, please ask for approval from [alice](https://github.com/alice), [cathy](https://github.com/cathy), [diana](https://github.com/diana), **ensuring that each of them provides their approval before proceeding**."
 
 	got := GetMessage(ap, linkURL, commandHelpLink, prProcessLink, org, repo, branch)
@@ -972,7 +968,6 @@ func TestGetMessageNoSuggestedCCMDAssignedCC(t *testing.T) {
 	}
 
 }
-
 
 func TestGetMessageAllApproved(t *testing.T) {
 	ap := NewApprovers(
@@ -1032,7 +1027,7 @@ func TestGetMessageNoneApproved(t *testing.T) {
 	want := `[APPROVALNOTIFIER] This PR is **NOT APPROVED**
 
 This pull-request has been approved by: *<a href="REFERENCE" title="Author self-approved">John</a>*
-**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [bill](https://github.com/bill) for approval, **ensuring that each of them provides their approval before proceeding**. For more information see [the Kubernetes Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
+**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [bill](https://github.com/bill) for approval, **ensuring that each of them provides their approval before proceeding**. For more information see [the Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
 
 *No associated issue*. Update pull-request body to add a reference to an issue, or get approval with ` + "`/approve no-issue`" + `
 
@@ -1159,7 +1154,7 @@ func TestGetMessageMDOwners(t *testing.T) {
 	want := `[APPROVALNOTIFIER] This PR is **NOT APPROVED**
 
 This pull-request has been approved by: *<a href="REFERENCE" title="Author self-approved">John</a>*
-**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [doctor](https://github.com/doctor) for approval, **ensuring that each of them provides their approval before proceeding**. For more information see [the Kubernetes Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
+**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [doctor](https://github.com/doctor) for approval, **ensuring that each of them provides their approval before proceeding**. For more information see [the Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
 
 *No associated issue*. Update pull-request body to add a reference to an issue, or get approval with ` + "`/approve no-issue`" + `
 
@@ -1199,7 +1194,7 @@ func TestGetMessageDifferentGitHubLink(t *testing.T) {
 	want := `[APPROVALNOTIFIER] This PR is **NOT APPROVED**
 
 This pull-request has been approved by: *<a href="REFERENCE" title="Author self-approved">John</a>*
-**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [doctor](https://github.com/doctor) for approval, **ensuring that each of them provides their approval before proceeding**. For more information see [the Kubernetes Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
+**Once this PR has been reviewed and has the lgtm label**, please assign [alice](https://github.com/alice), [doctor](https://github.com/doctor) for approval, **ensuring that each of them provides their approval before proceeding**. For more information see [the Code Review Process](https://git.k8s.io/community/contributors/guide/owners.md#the-code-review-process).
 
 *No associated issue*. Update pull-request body to add a reference to an issue, or get approval with ` + "`/approve no-issue`" + `
 
