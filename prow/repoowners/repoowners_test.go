@@ -960,110 +960,229 @@ var (
 	txtFileReg = regexp.MustCompile(`.*\.txt`)
 )
 
-func TestGetApprovers(t *testing.T) {
-	ro := &RepoOwners{
-		approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
-			baseDir: regexpAll("alice", "bob"),
-			leafDir: regexpAll("carl", "dave"),
-			leafFilterDir: {
-				mdFileReg:  sets.New[string]("carl", "dave"),
-				txtFileReg: sets.New[string]("elic"),
-			},
-			noParentsDir: regexpAll("mml"),
-			noParentsFilterDir: {
-				mdFileReg:  sets.New[string]("carl", "dave"),
-				txtFileReg: sets.New[string]("flex"),
-			},
-		},
-		options: map[string]dirOptions{
-			noParentsDir: {
-				NoParentOwners: true,
-			},
-			noParentsFilterDir: {
-				NoParentOwners: true,
-			},
-		},
-	}
+func TestGetReviewers(t *testing.T) {
 	tests := []struct {
 		name               string
+		ro                 *RepoOwners
 		filePath           string
 		expectedOwnersPath string
 		expectedLeafOwners sets.Set[string]
 		expectedAllOwners  sets.Set[string]
 	}{
 		{
-			name:               "Modified Base Dir Only",
-			filePath:           filepath.Join(baseDir, "testFile.md"),
-			expectedOwnersPath: baseDir,
-			expectedLeafOwners: ro.approvers[baseDir][nil],
-			expectedAllOwners:  ro.approvers[baseDir][nil],
+			name: "should inherit parent reviewers when no reviewers set",
+			ro: &RepoOwners{
+				reviewers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"": regexpAll("alice", "bob"),
+				},
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"l": regexpAll("lily"),
+				},
+				options: map[string]dirOptions{
+					"l": {NoParentOwners: true},
+				},
+			},
+			filePath:           "l/hello.txt",
+			expectedOwnersPath: "",
+			expectedLeafOwners: sets.New[string]("alice", "bob"),
+			expectedAllOwners:  sets.New[string]("alice", "bob"),
 		},
 		{
-			name:               "Modified Leaf Dir Only",
-			filePath:           filepath.Join(leafDir, "testFile.md"),
-			expectedOwnersPath: leafDir,
-			expectedLeafOwners: ro.approvers[leafDir][nil],
-			expectedAllOwners:  ro.approvers[baseDir][nil].Union(ro.approvers[leafDir][nil]),
+			name: "should not inherit parent reviewers when reviewers set",
+			ro: &RepoOwners{
+				reviewers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"":  regexpAll("alice", "bob"),
+					"l": regexpAll("lily"),
+				},
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"l": regexpAll("lily"),
+				},
+				options: map[string]dirOptions{
+					"l": {NoParentOwners: true},
+				},
+			},
+			filePath:           "l/hello.txt",
+			expectedOwnersPath: "l",
+			expectedLeafOwners: sets.New[string]("lily"),
+			expectedAllOwners:  sets.New[string]("lily"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.ro.LeafReviewers(tt.filePath); !got.Equal(tt.expectedLeafOwners) {
+				t.Errorf("LeafReviewers() = %v, want %v", got, tt.expectedLeafOwners)
+			}
+			if got := tt.ro.Reviewers(tt.filePath).Set(); !got.Equal(tt.expectedAllOwners) {
+				t.Errorf("Reviewers() = %v, want %v", got, tt.expectedAllOwners)
+			}
+			if got := tt.ro.FindReviewersOwnersForFile(tt.filePath); got != tt.expectedOwnersPath {
+				t.Errorf("FindReviewersOwnersForFile() = %v, want %v", got, tt.expectedOwnersPath)
+			}
+		})
+	}
+}
+
+func TestGetApprovers(t *testing.T) {
+	tests := []struct {
+		name               string
+		ro                 *RepoOwners
+		filePath           string
+		expectedOwnersPath string
+		expectedLeafOwners sets.Set[string]
+		expectedAllOwners  sets.Set[string]
+	}{
+		{
+			name: "Modified Base Dir Only",
+			ro: &RepoOwners{
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"":      regexpAll("alice", "bob"),
+					leafDir: regexpAll("carl", "dave"),
+				},
+			},
+			filePath:           "testFile.md",
+			expectedOwnersPath: "",
+			expectedLeafOwners: sets.New[string]("alice", "bob"),
+			expectedAllOwners:  sets.New[string]("alice", "bob"),
 		},
 		{
-			name:               "Modified regexp matched file in Leaf Dir Only",
-			filePath:           filepath.Join(leafFilterDir, "testFile.md"),
-			expectedOwnersPath: leafFilterDir,
-			expectedLeafOwners: ro.approvers[leafFilterDir][mdFileReg],
-			expectedAllOwners:  ro.approvers[baseDir][nil].Union(ro.approvers[leafFilterDir][mdFileReg]),
+			name: "Modified Leaf Dir Only",
+			ro: &RepoOwners{
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"":      regexpAll("alice", "bob"),
+					"a/b/c": regexpAll("carl", "dave"),
+				},
+			},
+			filePath:           "a/b/c/testFile.md",
+			expectedOwnersPath: "a/b/c",
+			expectedLeafOwners: sets.New[string]("carl", "dave"),
+			expectedAllOwners:  sets.New[string]("carl", "dave", "alice", "bob"),
 		},
 		{
-			name:               "Modified not regexp matched file in Leaf Dir Only",
-			filePath:           filepath.Join(leafFilterDir, "testFile.dat"),
-			expectedOwnersPath: baseDir,
-			expectedLeafOwners: ro.approvers[baseDir][nil],
-			expectedAllOwners:  ro.approvers[baseDir][nil],
+			name: "Modified regexp matched file in Leaf Dir Only",
+			ro: &RepoOwners{
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"": regexpAll("alice", "bob"),
+					"a/b/c": {
+						mdFileReg:  sets.New[string]("carl", "dave"),
+						txtFileReg: sets.New[string]("elic"),
+					},
+				},
+			},
+			filePath:           "a/b/c/testFile.md",
+			expectedOwnersPath: "a/b/c",
+			expectedLeafOwners: sets.New[string]("carl", "dave"),
+			expectedAllOwners:  sets.New[string]("carl", "dave", "alice", "bob"),
 		},
 		{
-			name:               "Modified NoParentOwners Dir Only",
-			filePath:           filepath.Join(noParentsDir, "testFile.go"),
-			expectedOwnersPath: noParentsDir,
-			expectedLeafOwners: ro.approvers[noParentsDir][nil],
-			expectedAllOwners:  ro.approvers[noParentsDir][nil],
+			name: "Modified not regexp matched file in Leaf Dir Only",
+			ro: &RepoOwners{
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"": regexpAll("alice", "bob"),
+					"a/b/c": {
+						mdFileReg:  sets.New[string]("carl", "dave"),
+						txtFileReg: sets.New[string]("elic"),
+					},
+				},
+			},
+			filePath:           "a/b/c/testFile.dat",
+			expectedOwnersPath: "",
+			expectedLeafOwners: sets.New[string]("alice", "bob"),
+			expectedAllOwners:  sets.New[string]("alice", "bob"),
 		},
 		{
-			name:               "Modified regexp matched file NoParentOwners Dir Only",
-			filePath:           filepath.Join(noParentsFilterDir, "testFile.txt"),
-			expectedOwnersPath: noParentsFilterDir,
-			expectedLeafOwners: ro.approvers[noParentsFilterDir][txtFileReg],
-			expectedAllOwners:  ro.approvers[noParentsFilterDir][txtFileReg],
+			name: "Modified NoParentOwners Dir Only",
+			ro: &RepoOwners{
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"":  regexpAll("alice", "bob"),
+					"d": regexpAll("mml"),
+				},
+				options: map[string]dirOptions{"d": {NoParentOwners: true}},
+			},
+			filePath:           "d/testFile.go",
+			expectedOwnersPath: "d",
+			expectedLeafOwners: sets.New[string]("mml"),
+			expectedAllOwners:  sets.New[string]("mml"),
 		},
 		{
-			name:               "Modified regexp not matched file in NoParentOwners Dir Only",
-			filePath:           filepath.Join(noParentsFilterDir, "testFile.go_to_parent"),
-			expectedOwnersPath: baseDir,
-			expectedLeafOwners: ro.approvers[baseDir][nil],
-			expectedAllOwners:  ro.approvers[baseDir][nil],
+			name: "Modified default regexp matched file NoParentOwners Dir Only",
+			ro: &RepoOwners{
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"": regexpAll("alice", "bob"),
+					"f": {
+						mdFileReg:  sets.New[string]("carl", "dave"),
+						txtFileReg: sets.New[string]("flex"),
+						nil:        sets.New[string]("bob"),
+					},
+				},
+				options: map[string]dirOptions{"f": {NoParentOwners: true}},
+			},
+			filePath:           "f/testFile.dat",
+			expectedOwnersPath: "f",
+			expectedLeafOwners: sets.New[string]("bob"),
+			expectedAllOwners:  sets.New[string]("bob"),
+		},
+		{
+			name: "Modified non-default regexp matched files NoParentOwners",
+			ro: &RepoOwners{
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"": regexpAll("alice", "bob"),
+					"f": {
+						mdFileReg:  sets.New[string]("carl", "dave"),
+						txtFileReg: sets.New[string]("flex"),
+						nil:        sets.New[string]("bob"),
+					},
+				},
+				options: map[string]dirOptions{"f": {NoParentOwners: true}},
+			},
+			filePath:           "f/testFile.txt",
+			expectedOwnersPath: "f",
+			expectedLeafOwners: sets.New[string]("flex"),
+			expectedAllOwners:  sets.New[string]("flex"),
+		},
+		{
+			name: "Modified regexp not matched file in NoParentOwners Dir Only",
+			ro: &RepoOwners{
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"": regexpAll("alice", "bob"),
+					"f": {
+						mdFileReg:  sets.New[string]("carl", "dave"),
+						txtFileReg: sets.New[string]("flex"),
+					},
+				},
+				options: map[string]dirOptions{"f": {NoParentOwners: true}},
+			},
+			filePath:           "f/testFile.go_to_parent",
+			expectedOwnersPath: "",
+			expectedLeafOwners: sets.New[string]("alice", "bob"),
+			expectedAllOwners:  sets.New[string]("alice", "bob"),
 		},
 		{
 			name:               "Modified Nonexistent Dir (Default to Base)",
+			ro: &RepoOwners{
+				approvers: map[string]map[*regexp.Regexp]sets.Set[string]{
+					"": regexpAll("alice", "bob"),
+				},
+			},      
 			filePath:           filepath.Join(nonExistentDir, "testFile.md"),
-			expectedOwnersPath: baseDir,
-			expectedLeafOwners: ro.approvers[baseDir][nil],
-			expectedAllOwners:  ro.approvers[baseDir][nil],
+			expectedOwnersPath: "",
+			expectedLeafOwners: sets.New[string]("alice", "bob"),
+			expectedAllOwners:  sets.New[string]("alice", "bob"),
 		},
 	}
-	for testNum, test := range tests {
-		foundLeafApprovers := ro.LeafApprovers(test.filePath)
-		foundApprovers := ro.Approvers(test.filePath).Set()
-		foundOwnersPath := ro.FindApproverOwnersForFile(test.filePath)
-		if !foundLeafApprovers.Equal(test.expectedLeafOwners) {
-			t.Errorf("The Leaf Approvers Found Do Not Match Expected For Test %d: %s", testNum, test.name)
-			t.Errorf("\tExpected Owners: %v\tFound Owners: %v ", test.expectedLeafOwners, foundLeafApprovers)
-		}
-		if !foundApprovers.Equal(test.expectedAllOwners) {
-			t.Errorf("The Approvers Found Do Not Match Expected For Test %d: %s", testNum, test.name)
-			t.Errorf("\tExpected Owners: %v\tFound Owners: %v ", test.expectedAllOwners, foundApprovers)
-		}
-		if foundOwnersPath != test.expectedOwnersPath {
-			t.Errorf("The Owners Path Found Does Not Match Expected For Test %d: %s", testNum, test.name)
-			t.Errorf("\tExpected Owners: %v\tFound Owners: %v ", test.expectedOwnersPath, foundOwnersPath)
-		}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.ro.LeafApprovers(tt.filePath); !got.Equal(tt.expectedLeafOwners) {
+				t.Errorf("LeafApprovers() = %v, want %v", got, tt.expectedLeafOwners)
+			}
+			if got := tt.ro.Approvers(tt.filePath).Set(); !got.Equal(tt.expectedAllOwners) {
+				t.Errorf("Approvers() = %v, want %v", got, tt.expectedAllOwners)
+			}
+			if got := tt.ro.FindApproverOwnersForFile(tt.filePath); got != tt.expectedOwnersPath {
+				t.Errorf("FindApproverOwnersForFile() = %v, want %v", got, tt.expectedOwnersPath)
+			}
+		})
 	}
 }
 
