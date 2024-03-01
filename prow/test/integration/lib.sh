@@ -45,6 +45,7 @@ declare -ra PROW_COMPONENTS=(
   gerrit
   hook
   horologium
+  moonraker
   prow-controller-manager
   sinker
   sub
@@ -63,6 +64,7 @@ declare -rA PROW_IMAGES=(
   [gerrit]=prow/cmd/gerrit
   [hook]=prow/cmd/hook
   [horologium]=prow/cmd/horologium
+  [moonraker]=prow/cmd/moonraker
   [prow-controller-manager]=prow/cmd/prow-controller-manager
   [sinker]=prow/cmd/sinker
   [sub]=prow/cmd/sub
@@ -92,6 +94,7 @@ declare -rA PROW_IMAGES_TO_COMPONENTS=(
   [gerrit]=gerrit
   [hook]=hook
   [horologium]=horologium
+  [moonraker]=moonraker
   [prow-controller-manager]=prow-controller-manager
   [sinker]=sinker
   [sub]=sub
@@ -112,6 +115,9 @@ declare -ra PROW_DEPLOYMENT_ORDER=(
   # ingress, etc) first.
   50_crd.yaml
   WAIT_FOR_CRD_prowjobs.prow.k8s.io,default
+
+  git-config-system.yaml
+  WAIT_FOR_RESOURCE_configmaps,git-config-system,default
 
   100_starter.yaml
   WAIT_FOR_RESOURCE_namespaces,test-pods,default
@@ -235,6 +241,12 @@ declare -ra PROW_DEPLOYMENT_ORDER=(
   WAIT_FOR_RESOURCE_clusterrolebindings,webhook-server,default
   WAIT_FOR_RESOURCE_serviceaccounts,webhook-server,default
   WAIT_webhook-server
+
+  moonraker_rbac.yaml
+  moonraker_service.yaml
+  moonraker_deployment.yaml
+  WAIT_FOR_RESOURCE_serviceaccounts,moonraker,default
+  WAIT_moonraker
 
   gangway_rbac.yaml
   gangway_service.yaml

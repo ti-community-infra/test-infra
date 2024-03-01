@@ -13,8 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -euo pipefail
+set -eo pipefail
 
 /register --reset -p yes
+if [ -z "${BUILDX_NO_DEFAULT_ATTESTATIONS}" ]; then
+    export BUILDX_NO_DEFAULT_ATTESTATIONS=1
+fi
 docker buildx create --use
 docker buildx "$@"

@@ -35,6 +35,7 @@ var gitMetrics = struct {
 	ensureFreshPrimaryDuration *prometheus.HistogramVec
 	fetchByShaDuration         *prometheus.HistogramVec
 	secondaryCloneDuration     *prometheus.HistogramVec
+	sparseCheckoutDuration     prometheus.Histogram
 }{
 	ensureFreshPrimaryDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "git_ensure_fresh_primary_duration",
@@ -53,9 +54,14 @@ var gitMetrics = struct {
 	secondaryCloneDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "git_secondary_clone_duration",
 		Help:    "Histogram of seconds spent creating the secondary clone, by org and repo.",
-		Buckets: []float64{0.5, 1, 2, 5, 10, 20, 30, 45, 60},
+		Buckets: []float64{0.5, 1, 2, 5, 10, 20, 30, 45, 60, 90},
 	}, []string{
 		"org", "repo",
+	}),
+	sparseCheckoutDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "sparse_checkout_duration",
+		Help:    "Histogram of seconds spent performing sparse checkout for a repository",
+		Buckets: []float64{0.5, 1, 2, 5, 10, 20, 30, 45, 60, 90},
 	}),
 }
 
@@ -63,6 +69,7 @@ func init() {
 	prometheus.MustRegister(gitMetrics.ensureFreshPrimaryDuration)
 	prometheus.MustRegister(gitMetrics.fetchByShaDuration)
 	prometheus.MustRegister(gitMetrics.secondaryCloneDuration)
+	prometheus.MustRegister(gitMetrics.sparseCheckoutDuration)
 }
 
 // ClientFactory knows how to create clientFactory for repos
@@ -95,6 +102,10 @@ type repoClient struct {
 type ClientFactoryOpts struct {
 	// Host, defaults to "github.com" if unset
 	Host string
+	// Whether to use HTTP. By default, HTTPS is used (overrides UseSSH).
+	//
+	// TODO (listx): Combine HTTPS, HTTP, and SSH schemes into a single enum.
+	UseInsecureHTTP *bool
 	// UseSSH, defaults to false
 	UseSSH *bool
 	// The directory in which the cache should be
@@ -127,22 +138,29 @@ type RepoOpts struct {
 	// tree, recursively.
 	SparseCheckoutDirs []string
 	// This is the `--share` flag to `git clone`. For cloning from a local
-	// source, it allows bypassing the copying of all objects.
-	ShareObjectsWithSourceRepo bool
-	// FetchCommits list only those commit SHAs which are needed. If the commit
-	// already exists, it is not fetched to save network costs. If FetchCommits
+	// source, it allows bypassing the copying of all objects. If this is true,
+	// you must also set NeededCommits to a non-empty value; otherwise, when the
+	// primary is updated with RemoteUpdate() the `--prune` flag may end up
+	// deleting objects in the primary (which could adversely affect the
+	// secondary).
+	ShareObjectsWithPrimaryClone bool
+	// NeededCommits list only those commit SHAs which are needed. If the commit
+	// already exists, it is not fetched to save network costs. If NeededCommits
 	// is set, we do not call RemoteUpdate() for the primary clone (git cache).
-	FetchCommits sets.Set[string]
-
-	// NoFetchTags determines whether we disable fetching tag objects). Defaults
-	// to false (tag objects are fetched).
-	NoFetchTags bool
+	NeededCommits sets.Set[string]
+	// BranchesToRetarget contains a map of branch names mapped to SHAs. These
+	// branch name and SHA pairs will be fed into RetargetBranch in the git v2
+	// client, to update the current HEAD of each branch.
+	BranchesToRetarget map[string]string
 }
 
 // Apply allows to use a ClientFactoryOpts as Opt
 func (cfo *ClientFactoryOpts) Apply(target *ClientFactoryOpts) {
 	if cfo.Host != "" {
 		target.Host = cfo.Host
+	}
+	if cfo.UseInsecureHTTP != nil {
+		target.UseInsecureHTTP = cfo.UseInsecureHTTP
 	}
 	if cfo.UseSSH != nil {
 		target.UseSSH = cfo.UseSSH
@@ -234,6 +252,7 @@ func NewClientFactory(opts ...ClientFactoryOpt) (ClientFactory, error) {
 	} else {
 		remote = &httpResolverFactory{
 			host:     o.Host,
+			http:     o.UseInsecureHTTP != nil && *o.UseInsecureHTTP,
 			username: o.Username,
 			token:    o.Token,
 		}
@@ -349,6 +368,10 @@ func (c *clientFactory) ClientFor(org, repo string) (RepoClient, error) {
 // org and repo are used for determining where the repo is cloned, cloneURI
 // overrides org/repo for cloning.
 func (c *clientFactory) ClientForWithRepoOpts(org, repo string, repoOpts RepoOpts) (RepoClient, error) {
+	if repoOpts.ShareObjectsWithPrimaryClone && repoOpts.NeededCommits.Len() == 0 {
+		return nil, fmt.Errorf("programmer error: cannot share objects between primary and secondary without targeted fetches (NeededCommits)")
+	}
+
 	cacheDir := path.Join(c.cacheDir, org, repo)
 	c.logger.WithFields(logrus.Fields{"org": org, "repo": repo, "dir": cacheDir}).Debug("Creating a client from the cache.")
 	cacheClientCacher, _, _, err := c.bootstrapClients(org, repo, cacheDir)
@@ -368,41 +391,72 @@ func (c *clientFactory) ClientForWithRepoOpts(org, repo string, repoOpts RepoOpt
 
 	// First create or update the primary clone (in "cacheDir").
 	timeBeforeEnsureFreshPrimary := time.Now()
-	c.ensureFreshPrimary(cacheDir, cacheClientCacher, repoOpts)
-	gitMetrics.ensureFreshPrimaryDuration.WithLabelValues(org, repo).Observe((float64(time.Since(timeBeforeEnsureFreshPrimary).Seconds())))
+	err = c.ensureFreshPrimary(cacheDir, cacheClientCacher, repoOpts, org, repo)
+	if err != nil {
+		c.logger.WithFields(logrus.Fields{"org": org, "repo": repo, "dir": cacheDir}).Errorf("Error encountered while refreshing primary clone: %s", err.Error())
+	} else {
+		gitMetrics.ensureFreshPrimaryDuration.WithLabelValues(org, repo).Observe(time.Since(timeBeforeEnsureFreshPrimary).Seconds())
+	}
 
 	// Initialize the new derivative repo (secondary clone) from the primary
 	// clone. This is a local clone operation.
 	timeBeforeSecondaryClone := time.Now()
-	if err := repoClientCloner.CloneWithRepoOpts(cacheDir, repoOpts); err != nil {
+	if err = repoClientCloner.CloneWithRepoOpts(cacheDir, repoOpts); err != nil {
 		return nil, err
 	}
-	gitMetrics.secondaryCloneDuration.WithLabelValues(org, repo).Observe((float64(time.Since(timeBeforeSecondaryClone).Seconds())))
-
-	// Here we do a targeted fetch, if the repoOpts for the secondary clone
-	// asked for it.
-	//
-	// TODO(listx): Change ensureCommits() so that it takes a "cacher" interface
-	// instead of a generic RepoClient. However, if ShareObjectsWithSourceRepo
-	// was not set, then we cannot run ensureCommits() with the cacher because
-	// the cacher will run on the primary, not secondary (and without --shared,
-	// this will have no effect on the secondary); we have to handle that case
-	// gracefully (perhaps with some logging also).
-	if repoOpts.FetchCommits.Len() > 0 {
-		// Targeted fetch. Only fetch those commits which we want, and only
-		// if they are missing.
-		timeBeforeFetchBySha := time.Now()
-		if err := repoClientCloner.FetchCommits(repoOpts.NoFetchTags, repoOpts.FetchCommits.UnsortedList()); err != nil {
-			return nil, err
-		}
-		gitMetrics.fetchByShaDuration.WithLabelValues(org, repo).Observe((float64(time.Since(timeBeforeFetchBySha).Seconds())))
-	}
+	gitMetrics.secondaryCloneDuration.WithLabelValues(org, repo).Observe(time.Since(timeBeforeSecondaryClone).Seconds())
 
 	return repoClient, nil
 }
 
-func (c *clientFactory) ensureFreshPrimary(cacheDir string, cacheClientCacher cacher, repoOpts RepoOpts) error {
-	// Protect access to the shared repoLocks map.
+func (c *clientFactory) ensureFreshPrimary(
+	cacheDir string,
+	cacheClientCacher cacher,
+	repoOpts RepoOpts,
+	org string,
+	repo string,
+) error {
+	if err := c.maybeCloneAndUpdatePrimary(cacheDir, cacheClientCacher, repoOpts); err != nil {
+		return err
+	}
+	// For targeted fetches by SHA objects, there's no need to hold a lock on
+	// the primary because it's safe to do so (git will first write to a
+	// temporary file and replace the file being written to, so if another git
+	// process already wrote to it, the worst case is that it will overwrite the
+	// file with the same data).  Targeted fetch. Only fetch those commits which
+	// we want, and only if they are missing.
+	if repoOpts.NeededCommits.Len() > 0 {
+		// Targeted fetch. Only fetch those commits which we want, and only if
+		// they are missing.
+		timeBeforeFetchBySha := time.Now()
+		if err := cacheClientCacher.FetchCommits(repoOpts.NeededCommits.UnsortedList()); err != nil {
+			return err
+		}
+		gitMetrics.fetchByShaDuration.WithLabelValues(org, repo).Observe(time.Since(timeBeforeFetchBySha).Seconds())
+
+		// Retarget branches. That is, make them point to a new SHA, so that the
+		// branches can get updated, even though we only fetch by SHA above.
+		//
+		// Because the branches never get used directly here, it's OK if this
+		// operation fails.
+		for branch, sha := range repoOpts.BranchesToRetarget {
+			if err := cacheClientCacher.RetargetBranch(branch, sha); err != nil {
+				c.logger.WithFields(logrus.Fields{"org": org, "repo": repo, "dir": cacheDir, "branch": branch}).WithError(err).Debug("failed to retarget branch")
+			}
+		}
+	}
+
+	return nil
+}
+
+// maybeCloneAndUpdatePrimary clones the primary if it doesn't exist yet, and
+// also runs a RemoteUpdate() against it if NeededCommits is empty. The
+// operations in this function are protected by a lock so that only one thread
+// can run at a given time for the same cacheDir (primary clone path).
+func (c *clientFactory) maybeCloneAndUpdatePrimary(cacheDir string, cacheClientCacher cacher, repoOpts RepoOpts) error {
+	// Protect access to the shared repoLocks map. The main point of all this
+	// locking is to ensure that we only try to create the primary clone (if it
+	// doesn't exist) in a serial manner.
 	var repoLock *sync.Mutex
 	c.masterLock.Lock()
 	if _, exists := c.repoLocks[cacheDir]; exists {
@@ -426,16 +480,18 @@ func (c *clientFactory) ensureFreshPrimary(cacheDir string, cacheClientCacher ca
 	} else if err != nil {
 		// something unexpected happened
 		return err
-	} else {
+	} else if repoOpts.NeededCommits.Len() == 0 {
 		// We have cloned the repo previously, but will refresh it. By default
 		// we refresh all refs with a call to `git remote update`.
 		//
-		// This is the default behavior if FetchCommits is empty or nil (i.e.,
+		// This is the default behavior if NeededCommits is empty or nil (i.e.,
 		// when we don't define a targeted list of commits to fetch directly).
-		if repoOpts.FetchCommits.Len() == 0 {
-			if err := cacheClientCacher.RemoteUpdate(); err != nil {
-				return err
-			}
+		//
+		// This call to RemoteUpdate() still needs to be protected by a lock
+		// because it updates possibly hundreds, if not thousands, of refs
+		// (quite literally, files in .git/refs/*).
+		if err := cacheClientCacher.RemoteUpdate(); err != nil {
+			return err
 		}
 	}
 

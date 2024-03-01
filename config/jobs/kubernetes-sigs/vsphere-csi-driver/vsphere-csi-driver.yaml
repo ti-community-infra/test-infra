@@ -9,7 +9,7 @@ presubmits:
     path_alias: sigs.k8s.io/vsphere-csi-driver
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - make
         args:
@@ -36,7 +36,7 @@ presubmits:
     path_alias: sigs.k8s.io/vsphere-csi-driver
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - make
         args:
@@ -142,7 +142,7 @@ presubmits:
     path_alias: sigs.k8s.io/vsphere-csi-driver
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - make
         args:
@@ -162,6 +162,8 @@ presubmits:
 
   # Builds the CSI binary
   - name: pull-vsphere-csi-driver-build
+    labels:
+      preset-dind-enabled: "true"
     cluster: eks-prow-build-cluster
     always_run: false
     run_if_changed: '^(cmd|pkg|go.mod)'
@@ -171,11 +173,12 @@ presubmits:
     skip_report: false
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
-        - "make"
+        - runner.sh
         args:
-        - "build"
+        - make
+        - build
         resources:
           limits:
             cpu: 2
@@ -198,7 +201,7 @@ presubmits:
     skip_report: false
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - "make"
         args:
@@ -232,11 +235,12 @@ postsubmits:
     skip_submodules: true
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
-        - "make"
+        - runner.sh
         args:
-        - "deploy"
+        - make
+        - deploy
         securityContext:
           privileged: true
         resources:
@@ -265,11 +269,12 @@ postsubmits:
     skip_submodules: true
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
-        - "make"
+        - runner.sh
         args:
-        - "push-images"
+        - make
+        - push-images
         securityContext:
           privileged: true
         resources:

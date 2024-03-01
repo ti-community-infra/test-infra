@@ -21,7 +21,8 @@ FROM debian:bookworm
 # arg that specifies the image name (for debugging)
 ARG IMAGE_ARG
 
-# arg that specifies the go version to install
+# arg that specifies the go version to install.
+# empty value specifies the latest version.
 ARG GO_VERSION
 
 # add envs:
@@ -71,6 +72,7 @@ RUN echo "Installing Packages ..." \
             unzip \
         && rm -rf /var/lib/apt/lists/* \
     && echo "Installing Go ..." \
+        && if [ -z "${GO_VERSION}" ]; then GO_VERSION=$(curl -fsSL https://go.dev/VERSION?m=text | grep -oP "go\K(.*)"); fi \
         && export GO_TARBALL="go${GO_VERSION}.linux-amd64.tar.gz" \
         && curl -fsSL "https://go.dev/dl/${GO_TARBALL}" --output "${GO_TARBALL}" \
         && tar xzf "${GO_TARBALL}" -C /usr/local \
@@ -96,6 +98,7 @@ RUN echo "Installing Packages ..." \
         && apt-get install -y --no-install-recommends docker-ce docker-buildx-plugin \
         && rm -rf /var/lib/apt/lists/* \
         && sed -i 's/cgroupfs_mount$/#cgroupfs_mount\n/' /etc/init.d/docker \
+        && sed -i 's/ulimit -Hn/# ulimit -Hn/g' /etc/init.d/docker \
     && echo "Ensuring Legacy Iptables ..." \
         && update-alternatives --set iptables /usr/sbin/iptables-legacy \
         && update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy

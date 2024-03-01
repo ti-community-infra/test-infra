@@ -22,7 +22,7 @@ periodics:
   decoration_config:
     timeout: 4h0m0s
   extra_refs:
-  - base_ref: release-1.10
+  - base_ref: release-1.13
     org: kubernetes-sigs
     path_alias: sigs.k8s.io/cluster-api-provider-azure
     repo: cluster-api-provider-azure
@@ -53,7 +53,7 @@ periodics:
       - env
       - KUBERNETES_VERSION=latest-1.28
       - ./capz/run-capz-e2e.sh
-      image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-1.28
+      image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-1.28
       name: ""
       resources:
         requests:
@@ -61,6 +61,9 @@ periodics:
           memory: 9Gi
       securityContext:
         privileged: true
+      env:
+        - name: IMAGE_VERSION
+          value: "127.1.20230417" # pin the Windows nodes to a specific OS patch version while investigating an issue with container updates
 - name: ci-kubernetes-e2e-capz-1-28-windows-serial-slow
   interval: 48h
   decorate: true
@@ -81,7 +84,7 @@ periodics:
   extra_refs:
   - org: kubernetes-sigs
     repo: cluster-api-provider-azure
-    base_ref: release-1.10
+    base_ref: release-1.13
     path_alias: sigs.k8s.io/cluster-api-provider-azure
     workdir: false
   - org: kubernetes-sigs
@@ -96,7 +99,7 @@ periodics:
     workdir: false
   spec:
     containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-1.28
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-1.28
         command:
           - "runner.sh"
           - "env"

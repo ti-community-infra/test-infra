@@ -35,6 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iproute2 \
     iputils-ping \
     jq \
+    kmod \
     mercurial \
     openssh-client \
     pkg-config \
@@ -43,6 +44,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-distutils \
     python3-gflags \
     python3-pip \
+    python3-venv \
     python3-yaml \
     rsync \
     unzip \
@@ -51,7 +53,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/* \
-    && python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+    && python3 -m pip install --no-cache-dir --break-system-packages --upgrade pip setuptools wheel
 
 # Install gcloud
 
@@ -88,11 +90,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Add the Docker apt-repository
-RUN curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg \
-    | apt-key add - && \
-    add-apt-repository \
-    "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
-    $(lsb_release -cs) stable"
+RUN curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && chmod a+r /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+    "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+    tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 # Install Docker
 # TODO: the `sed` is a bit of a hack, look into alternatives.

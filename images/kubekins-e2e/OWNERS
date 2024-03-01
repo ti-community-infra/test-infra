@@ -5,10 +5,8 @@ reviewers:
 - cpanato
 - jeremyrickard
 - justaugustus
-- MushuEE
 - puerco
 - saschagrunert
-- spiffxp
 - Verolop
 - xmudrii
 approvers:
@@ -19,6 +17,7 @@ approvers:
 emeritus_approvers:
 - amwat
 - spiffxp
+- MushuEE
 
 labels:
 - sig/release

@@ -2,25 +2,28 @@
 
 reviewers:
 - CecileRobertMichon
-- davidewatson
-- detiber
+- chrischdi
 - fabriziopandini
 - JoelSpeed
 - justinsb
 - sbueringer
 - killianmuldoon
-- timothysc
+- neolit123
 - vincepri
 approvers:
 - CecileRobertMichon
-- davidewatson
-- detiber
+- chrischdi
 - fabriziopandini
 - justinsb
 - sbueringer
 - killianmuldoon
-- timothysc
+- neolit123
 - vincepri
 emeritus_approvers:
 - luxas
 - ncdc
+- timothysc
+- detiber
+- davidewatson
+labels:
+- sig/cluster-lifecycle

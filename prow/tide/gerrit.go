@@ -35,6 +35,7 @@ import (
 	"k8s.io/test-infra/prow/git/v2"
 	"k8s.io/test-infra/prow/io"
 	"k8s.io/test-infra/prow/kube"
+	"k8s.io/test-infra/prow/moonraker"
 	"k8s.io/test-infra/prow/tide/blockers"
 	"k8s.io/test-infra/prow/tide/history"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -121,11 +122,22 @@ func NewGerritController(
 		newPoolPending:   make(chan bool),
 	}
 
-	cacheGetter, err := config.NewInRepoConfigCache(configOptions.InRepoConfigCacheSize, cfgAgent, gc)
-	if err != nil {
-		return nil, fmt.Errorf("failed creating inrepoconfig cache getter: %v", err)
+	var ircg config.InRepoConfigGetter
+	if configOptions.MoonrakerAddress != "" {
+		moonrakerClient, err := moonraker.NewClient(configOptions.MoonrakerAddress, cfgAgent)
+		if err != nil {
+			logrus.WithError(err).Fatal("Error getting Moonraker client.")
+		}
+		ircg = moonrakerClient
+	} else {
+		var err error
+		ircg, err = config.NewInRepoConfigCache(configOptions.InRepoConfigCacheSize, cfgAgent, gc)
+		if err != nil {
+			return nil, fmt.Errorf("failed creating inrepoconfig cache: %v", err)
+		}
 	}
-	provider := newGerritProvider(logger, cfgAgent.Config, mgr.GetClient(), cacheGetter, cookieFilePath, "", maxQPS, maxBurst)
+
+	provider := newGerritProvider(logger, cfgAgent.Config, mgr.GetClient(), ircg, cookieFilePath, "", maxQPS, maxBurst)
 	syncCtrl, err := newSyncController(ctx, logger, mgr, provider, cfgAgent.Config, gc, hist, false, statusUpdate)
 	if err != nil {
 		return nil, err
@@ -145,9 +157,9 @@ type GerritProvider struct {
 	gc          gerritClient
 	pjclientset ctrlruntimeclient.Client
 
-	cookiefilePath    string
-	inRepoConfigCache *config.InRepoConfigCache
-	tokenPathOverride string
+	cookiefilePath     string
+	inRepoConfigGetter config.InRepoConfigGetter
+	tokenPathOverride  string
 
 	logger *logrus.Entry
 }
@@ -156,7 +168,7 @@ func newGerritProvider(
 	logger *logrus.Entry,
 	cfg config.Getter,
 	pjclientset ctrlruntimeclient.Client,
-	inRepoConfigCache *config.InRepoConfigCache,
+	ircg config.InRepoConfigGetter,
 	cookiefilePath string,
 	tokenPathOverride string,
 	maxQPS, maxBurst int,
@@ -171,13 +183,13 @@ func newGerritProvider(
 	gerritClient.ApplyGlobalConfig(orgRepoConfigGetter, nil, cookiefilePath, tokenPathOverride, nil)
 
 	return &GerritProvider{
-		logger:            logger,
-		cfg:               cfg,
-		pjclientset:       pjclientset,
-		gc:                gerritClient,
-		inRepoConfigCache: inRepoConfigCache,
-		cookiefilePath:    cookiefilePath,
-		tokenPathOverride: tokenPathOverride,
+		logger:             logger,
+		cfg:                cfg,
+		pjclientset:        pjclientset,
+		gc:                 gerritClient,
+		inRepoConfigGetter: ircg,
+		cookiefilePath:     cookiefilePath,
+		tokenPathOverride:  tokenPathOverride,
 	}
 }
 
@@ -249,6 +261,8 @@ func (p *GerritProvider) blockers() (blockers.Blockers, error) {
 }
 
 func (p *GerritProvider) isAllowedToMerge(crc *CodeReviewCommon) (string, error) {
+	// gci.Mergeable is only set if this feature is enabled on the Gerrit Host.
+	// https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html#change-info
 	if crc.Mergeable == string(githubql.MergeableStateConflicting) {
 		return "PR has a merge conflict.", nil
 	}
@@ -379,19 +393,14 @@ func (p *GerritProvider) prMergeMethod(crc *CodeReviewCommon) *types.PullRequest
 //
 // (TODO:chaodaiG): deduplicate this with GitHub, which means inrepoconfig
 // processing all use cache client.
-func (p *GerritProvider) GetPresubmits(identifier string, baseSHAGetter config.RefGetter, headSHAGetters ...config.RefGetter) ([]config.Presubmit, error) {
-	// Get presubmits from Config alone.
-	presubmits := p.cfg().GetPresubmitsStatic(identifier)
-	// If InRepoConfigCache is provided, then it means that we also want to fetch
+func (p *GerritProvider) GetPresubmits(identifier, baseBranch string, baseSHAGetter config.RefGetter, headSHAGetters ...config.RefGetter) ([]config.Presubmit, error) {
+	// If InRepoConfigCache is provided, then it means that we want to fetch
 	// from an inrepoconfig.
-	if p.inRepoConfigCache != nil {
-		presubmitsFromCache, err := p.inRepoConfigCache.GetPresubmits(identifier, baseSHAGetter, headSHAGetters...)
-		if err != nil {
-			return nil, fmt.Errorf("faled to get presubmits from cache: %v", err)
-		}
-		presubmits = append(presubmits, presubmitsFromCache...)
+	if p.inRepoConfigGetter != nil {
+		return p.inRepoConfigGetter.GetPresubmits(identifier, baseBranch, baseSHAGetter, headSHAGetters...)
 	}
-	return presubmits, nil
+	// Get presubmits from Config alone.
+	return p.cfg().GetPresubmitsStatic(identifier), nil
 }
 
 func (p *GerritProvider) GetChangedFiles(org, repo string, number int) ([]string, error) {

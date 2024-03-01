@@ -1,6 +1,7 @@
 presubmits:
   kubernetes/kubernetes:
   - name: pull-kubernetes-e2e-gci-gce-autoscaling
+    cluster: k8s-infra-prow-build
     annotations:
       testgrid-dashboards: sig-autoscaling-cluster-autoscaler
       testgrid-tab-name: gci-gce-autoscaling-pull
@@ -12,18 +13,21 @@ presubmits:
       preset-service-account: "true"
       preset-k8s-ssh: "true"
       preset-dind-enabled: "true"
+    decorate: true
+    decoration_config:
+      timeout: 450m
+    path_alias: k8s.io/kubernetes
+    extra_refs:
+    - org: kubernetes
+      repo: release
+      base_ref: master
+      path_alias: k8s.io/release
     spec:
       containers:
-      - args:
-        - --root=/go/src
-        - --job=$(JOB_NAME)
-        - --repo=k8s.io/$(REPO_NAME)=$(PULL_REFS)
-        - --repo=k8s.io/release
-        - --service-account=/etc/service-account/service-account.json
-        - --upload=gs://kubernetes-jenkins/pr-logs
-        - --timeout=450
-        - --scenario=kubernetes_e2e
-        - --
+      - command:
+        - runner.sh
+        - /workspace/scenarios/kubernetes_e2e.py
+        args:
         - --build=quick
         - --cluster=
         # Override GCE default for cluster size autoscaling purposes.
@@ -37,18 +41,25 @@ presubmits:
         - --extract=local
         - --gcp-node-image=gci
         - --gcp-nodes=3
-        - --gcp-project=k8s-jkns-gci-autoscaling
         - --gcp-zone=us-west1-b
         - --provider=gce
         - --stage=gs://kubernetes-release-pull/ci/pull-kubernetes-e2e-gci-gce-autoscaling
         - --runtime-config=scheduling.k8s.io/v1alpha1=true
         - --test_args=--ginkgo.focus=\[Feature:ClusterSizeAutoscalingScaleUp\]|\[Feature:ClusterSizeAutoscalingScaleDown\]|\[Feature:InitialResources\] --ginkgo.skip=\[Flaky\] --minStartupPods=8
         - --timeout=400m
-        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         securityContext:
           privileged: true
+        resources:
+          limits:
+            cpu: 2
+            memory: 6Gi
+          requests:
+            cpu: 2
+            memory: 6Gi
 
   - name: pull-kubernetes-e2e-autoscaling-hpa-cpu
+    cluster: k8s-infra-prow-build
     annotations:
       testgrid-dashboards: sig-autoscaling-hpa
       testgrid-tab-name: gci-gce-autoscaling-hpa-cpu-pull
@@ -86,11 +97,19 @@ presubmits:
         - --ginkgo-parallel=1
         - --stage=gs://kubernetes-release-pull/ci/pull-kubernetes-e2e-autoscaling-hpa-cpu
         - --timeout=300m
-        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         securityContext:
           privileged: true
+        resources:
+          limits:
+            cpu: 2
+            memory: 6Gi
+          requests:
+            cpu: 2
+            memory: 6Gi
 
   - name: pull-kubernetes-e2e-autoscaling-hpa-cm
+    cluster: k8s-infra-prow-build
     annotations:
       testgrid-dashboards: sig-autoscaling-hpa
       testgrid-tab-name: gci-gce-autoscaling-hpa-cm-pull
@@ -128,6 +147,13 @@ presubmits:
         - --test_args=--ginkgo.focus=\[Feature:CustomMetricsAutoscaling\] --ginkgo.skip=\[Flaky\] --minStartupPods=8
         - --stage=gs://kubernetes-release-pull/ci/pull-kubernetes-e2e-autoscaling-hpa-cm
         - --timeout=300m
-        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+        image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         securityContext:
           privileged: true
+        resources:
+          limits:
+            cpu: 2
+            memory: 6Gi
+          requests:
+            cpu: 2
+            memory: 6Gi

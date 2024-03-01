@@ -1,6 +1,7 @@
 presubmits:
   kubernetes-sigs/blob-csi-driver:
   - name: pull-blob-csi-driver-verify
+    cluster: k8s-infra-prow-build
     decorate: true
     always_run: true
     path_alias: sigs.k8s.io/blob-csi-driver
@@ -8,7 +9,7 @@ presubmits:
       preset-service-account: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         args:
@@ -16,12 +17,20 @@ presubmits:
         - verify
         securityContext:
           privileged: true
+        resources:
+          limits:
+            cpu: 4
+            memory: 8Gi
+          requests:
+            cpu: 4
+            memory: 8Gi
     annotations:
       testgrid-dashboards: provider-azure-blobfuse-csi-driver
       testgrid-tab-name: pr-blob-csi-driver-verify
       description: "Run code verification tests for Azure Blob Storage CSI driver."
       testgrid-num-columns-recent: '30'
   - name: pull-blob-csi-driver-unit
+    cluster: k8s-infra-prow-build
     decorate: true
     skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
     path_alias: sigs.k8s.io/blob-csi-driver
@@ -29,7 +38,7 @@ presubmits:
       preset-service-account: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         args:
@@ -37,6 +46,13 @@ presubmits:
         - unit-test
         securityContext:
           privileged: true
+        resources:
+          limits:
+            cpu: 4
+            memory: 8Gi
+          requests:
+            cpu: 4
+            memory: 8Gi
     annotations:
       testgrid-dashboards: provider-azure-blobfuse-csi-driver
       testgrid-tab-name: pr-blob-csi-driver-unit
@@ -52,7 +68,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         args:
@@ -67,7 +83,7 @@ presubmits:
       testgrid-num-columns-recent: '30'
   - name: pull-blob-csi-driver-integration
     decorate: true
-    skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
+    always_run: false
     path_alias: sigs.k8s.io/blob-csi-driver
     labels:
       preset-service-account: "true"
@@ -75,7 +91,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         args:
@@ -88,55 +104,9 @@ presubmits:
       testgrid-tab-name: pr-blob-csi-driver-integration
       description: "Run integration tests for Azure Blob Storage CSI driver."
       testgrid-num-columns-recent: '30'
-  - name: pull-blob-csi-driver-e2e
-    decorate: true
-    skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
-    path_alias: sigs.k8s.io/blob-csi-driver
-    labels:
-      preset-service-account: "true"
-      preset-azure-cred: "true"
-      preset-dind-enabled: "true"
-    extra_refs:
-    - org: kubernetes
-      repo: kubernetes
-      base_ref: master
-      path_alias: k8s.io/kubernetes
-      workdir: true
-    spec:
-      containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
-        command:
-        - runner.sh
-        - kubetest
-        args:
-        # Generic e2e test args
-        - --test
-        - --up
-        - --down
-        - --dump=$(ARTIFACTS)
-        # Azure-specific test args
-        - --provider=skeleton
-        - --deployment=aksengine
-        - --aksengine-admin-username=azureuser
-        - --aksengine-creds=$(AZURE_CREDENTIALS)
-        - --aksengine-orchestratorRelease=1.21
-        - --aksengine-public-key=$(AZURE_SSH_PUBLIC_KEY_FILE)
-        - --aksengine-template-url=https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/test/manifest/linux.json
-        - --aksengine-download-url=https://aka.ms/aks-engine/aks-engine-k8s-e2e.tar.gz
-        - --test-blob-csi-driver
-        # Specific test args
-        - --ginkgo-parallel=1
-        - --timeout=420m
-        securityContext:
-          privileged: true
-    annotations:
-      testgrid-dashboards: provider-azure-blobfuse-csi-driver
-      testgrid-tab-name: pr-blob-csi-driver-e2e
-      description: "Run E2E tests for Azure Blob Storage CSI driver."
-      testgrid-num-columns-recent: '30'
   - name: pull-blob-csi-driver-e2e-vmss
     decorate: true
-    skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
+    always_run: false
     path_alias: sigs.k8s.io/blob-csi-driver
     labels:
       preset-service-account: "true"
@@ -150,7 +120,7 @@ presubmits:
       workdir: true
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - kubetest
@@ -165,7 +135,7 @@ presubmits:
         - --deployment=aksengine
         - --aksengine-admin-username=azureuser
         - --aksengine-creds=$(AZURE_CREDENTIALS)
-        - --aksengine-orchestratorRelease=1.23
+        - --aksengine-orchestratorRelease=1.24
         - --aksengine-public-key=$(AZURE_SSH_PUBLIC_KEY_FILE)
         - --aksengine-template-url=https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/test/manifest/linux-vmss.json
         - --aksengine-download-url=https://aka.ms/aks-engine/aks-engine-k8s-e2e.tar.gz
@@ -183,198 +153,104 @@ presubmits:
     skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
     path_alias: sigs.k8s.io/blob-csi-driver
     labels:
-      preset-service-account: "true"
-      preset-azure-cred: "true"
       preset-dind-enabled: "true"
+      preset-kind-volume-mounts: "true"
+      preset-azure-cred-only: "true"
+      preset-azure-anonymous-pull: "true"
+      preset-azure-capz-sa-cred: "true"
     extra_refs:
-    - org: kubernetes
-      repo: kubernetes
-      base_ref: master
-      path_alias: k8s.io/kubernetes
-      workdir: true
+      - org: kubernetes-sigs
+        repo: cluster-api-provider-azure
+        base_ref: release-1.13
+        path_alias: sigs.k8s.io/cluster-api-provider-azure
+        workdir: true
+      - org: kubernetes-sigs
+        repo: cloud-provider-azure
+        base_ref: release-1.28
+        path_alias: sigs.k8s.io/cloud-provider-azure
+        workdir: false
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
-        command:
-        - runner.sh
-        - kubetest
-        args:
-        # Generic e2e test args
-        - --test
-        - --up
-        - --down
-        - --dump=$(ARTIFACTS)
-        # Azure-specific test args
-        - --provider=skeleton
-        - --deployment=aksengine
-        - --aksengine-admin-username=azureuser
-        - --aksengine-creds=$(AZURE_CREDENTIALS)
-        - --aksengine-orchestratorRelease=1.23
-        - --aksengine-public-key=$(AZURE_SSH_PUBLIC_KEY_FILE)
-        - --aksengine-template-url=https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/test/manifest/linux.json
-        - --aksengine-download-url=https://aka.ms/aks-engine/aks-engine-k8s-e2e.tar.gz
-        - --test-blob-csi-driver
-        # Specific test args
-        - --ginkgo-parallel=1
-        - --timeout=420m
-        securityContext:
-          privileged: true
-        env:
-          - name: ENABLE_BLOBFUSE_PROXY
-            value: "true"
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
+          command:
+            - runner.sh
+            - ./scripts/ci-entrypoint.sh
+          args:
+            - bash
+            - -c
+            - >-
+              cd ${GOPATH}/src/sigs.k8s.io/blob-csi-driver &&
+              make e2e-test
+          securityContext:
+            privileged: true
+          env:
+            - name: NODE_MACHINE_TYPE # CAPZ config
+              value: "Standard_D2s_v3"
+            - name: KUBERNETES_VERSION # CAPZ config
+              value: "latest-1.28"
+            - name: DISABLE_ZONE
+              value: "true"
+            - name: ENABLE_BLOBFUSE_PROXY
+              value: "true"
     annotations:
       testgrid-dashboards: provider-azure-blobfuse-csi-driver
       testgrid-tab-name: pull-blob-csi-driver-e2e-proxy
       description: "Run E2E tests for Azure Blob Storage CSI driver based on blobfuse-proxy"
       testgrid-num-columns-recent: '30'
+  - name: pull-blob-csi-driver-e2e-proxy-managed-identity
+    decorate: true
+    always_run: false
+    path_alias: sigs.k8s.io/blob-csi-driver
+    labels:
+      preset-dind-enabled: "true"
+      preset-kind-volume-mounts: "true"
+      preset-azure-cred-only: "true"
+      preset-azure-anonymous-pull: "true"
+      preset-azure-capz-sa-cred: "true"
+    extra_refs:
+      - org: kubernetes-sigs
+        repo: cluster-api-provider-azure
+        base_ref: release-1.12
+        path_alias: sigs.k8s.io/cluster-api-provider-azure
+        workdir: true
+      - org: kubernetes-sigs
+        repo: cloud-provider-azure
+        base_ref: release-1.28
+        path_alias: sigs.k8s.io/cloud-provider-azure
+        workdir: false
+    spec:
+      containers:
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
+          command:
+            - runner.sh
+            - ./scripts/ci-entrypoint.sh
+          args:
+            - bash
+            - -c
+            - >-
+              cd ${GOPATH}/src/sigs.k8s.io/blob-csi-driver &&
+              make e2e-test
+          securityContext:
+            privileged: true
+          env:
+            - name: NODE_MACHINE_TYPE # CAPZ config
+              value: "Standard_D2s_v3"
+            - name: KUBERNETES_VERSION # CAPZ config
+              value: "latest-1.28"
+            - name: DISABLE_ZONE
+              value: "true"
+            - name: ENABLE_BLOBFUSE_PROXY
+              value: "true"
+            - name: AZWI # CAPZ config
+              value: "true"
+            - name: CLUSTER_TEMPLATE # CAPZ config
+              value: https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/test/manifest/capz-template-prow-workload-identity.yaml
+    annotations:
+      testgrid-dashboards: provider-azure-blobfuse-csi-driver
+      testgrid-tab-name: pull-blob-csi-driver-e2e-proxy-managed-identity
+      description: "Run E2E tests for Azure Blob Storage CSI driver based on blobfuse-proxy-managed-identity"
+      testgrid-num-columns-recent: '30'
   - name: pull-blob-csi-driver-external-e2e-blobfuse
-    decorate: true
-    skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
-    path_alias: sigs.k8s.io/blob-csi-driver
-    labels:
-      preset-service-account: "true"
-      preset-azure-cred: "true"
-      preset-dind-enabled: "true"
-    extra_refs:
-    - org: kubernetes
-      repo: kubernetes
-      base_ref: master
-      path_alias: k8s.io/kubernetes
-      workdir: true
-    spec:
-      containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
-        command:
-        - runner.sh
-        - kubetest
-        args:
-        # Generic e2e test args
-        - --test
-        - --up
-        - --down
-        - --dump=$(ARTIFACTS)
-        # Azure-specific test args
-        - --provider=skeleton
-        - --deployment=aksengine
-        - --aksengine-admin-username=azureuser
-        - --aksengine-creds=$(AZURE_CREDENTIALS)
-        - --aksengine-orchestratorRelease=1.24
-        - --aksengine-public-key=$(AZURE_SSH_PUBLIC_KEY_FILE)
-        - --aksengine-template-url=https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/test/manifest/linux.json
-        - --aksengine-download-url=https://github.com/Azure/aks-engine/releases/download/nightly/aks-engine-nightly-linux-amd64.tar.gz
-        - --test-blob-csi-driver
-        # Specific test args
-        - --ginkgo-parallel=1
-        - --timeout=420m
-        securityContext:
-          privileged: true
-        env:
-          - name: EXTERNAL_E2E_TEST_BLOBFUSE
-            value: "true"
-    annotations:
-      testgrid-dashboards: provider-azure-blobfuse-csi-driver
-      testgrid-tab-name: pr-blob-csi-driver-external-e2e-blobfuse
-      description: "Run External E2E tests for Azure Blob Storage CSI driver using blobfuse."
-      testgrid-num-columns-recent: '30'
-  - name: pull-blob-csi-driver-external-e2e-blobfuse-v2
-    decorate: true
-    skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
-    path_alias: sigs.k8s.io/blob-csi-driver
-    labels:
-      preset-service-account: "true"
-      preset-azure-cred: "true"
-      preset-dind-enabled: "true"
-    extra_refs:
-    - org: kubernetes
-      repo: kubernetes
-      base_ref: master
-      path_alias: k8s.io/kubernetes
-      workdir: true
-    spec:
-      containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
-        command:
-        - runner.sh
-        - kubetest
-        args:
-        # Generic e2e test args
-        - --test
-        - --up
-        - --down
-        - --dump=$(ARTIFACTS)
-        # Azure-specific test args
-        - --provider=skeleton
-        - --deployment=aksengine
-        - --aksengine-admin-username=azureuser
-        - --aksengine-creds=$(AZURE_CREDENTIALS)
-        - --aksengine-orchestratorRelease=1.23
-        - --aksengine-public-key=$(AZURE_SSH_PUBLIC_KEY_FILE)
-        - --aksengine-template-url=https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/test/manifest/linux.json
-        - --aksengine-download-url=https://github.com/Azure/aks-engine/releases/download/nightly/aks-engine-nightly-linux-amd64.tar.gz
-        - --test-blob-csi-driver
-        # Specific test args
-        - --ginkgo-parallel=1
-        - --timeout=420m
-        securityContext:
-          privileged: true
-        env:
-          - name: EXTERNAL_E2E_TEST_BLOBFUSE_v2
-            value: "true"
-    annotations:
-      testgrid-dashboards: provider-azure-blobfuse-csi-driver
-      testgrid-tab-name: pr-blob-csi-driver-external-e2e-blobfuse-v2
-      description: "Run External E2E tests for Azure Blob Storage CSI driver using blobfuse v2."
-      testgrid-num-columns-recent: '30'
-  - name: pull-blob-csi-driver-external-e2e-nfs
-    decorate: true
-    skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
-    path_alias: sigs.k8s.io/blob-csi-driver
-    labels:
-      preset-service-account: "true"
-      preset-azure-cred: "true"
-      preset-dind-enabled: "true"
-    extra_refs:
-    - org: kubernetes
-      repo: kubernetes
-      base_ref: master
-      path_alias: k8s.io/kubernetes
-      workdir: true
-    spec:
-      containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
-        command:
-        - runner.sh
-        - kubetest
-        args:
-        # Generic e2e test args
-        - --test
-        - --up
-        - --down
-        - --dump=$(ARTIFACTS)
-        # Azure-specific test args
-        - --provider=skeleton
-        - --deployment=aksengine
-        - --aksengine-admin-username=azureuser
-        - --aksengine-creds=$(AZURE_CREDENTIALS)
-        - --aksengine-orchestratorRelease=1.24
-        - --aksengine-public-key=$(AZURE_SSH_PUBLIC_KEY_FILE)
-        - --aksengine-template-url=https://raw.githubusercontent.com/kubernetes-sigs/blob-csi-driver/master/test/manifest/linux.json
-        - --aksengine-download-url=https://github.com/Azure/aks-engine/releases/download/nightly/aks-engine-nightly-linux-amd64.tar.gz
-        - --test-blob-csi-driver
-        # Specific test args
-        - --ginkgo-parallel=1
-        - --timeout=420m
-        securityContext:
-          privileged: true
-        env:
-          - name: EXTERNAL_E2E_TEST_NFS
-            value: "true"
-    annotations:
-      testgrid-dashboards: provider-azure-blobfuse-csi-driver
-      testgrid-tab-name: pr-blob-csi-driver-external-e2e-nfs
-      description: "Run External E2E tests for Azure Blob Storage CSI driver using nfs."
-      testgrid-num-columns-recent: '30'
-  - name: pull-blob-csi-driver-e2e-capz
     decorate: true
     skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
     path_alias: sigs.k8s.io/blob-csi-driver
@@ -387,17 +263,66 @@ presubmits:
     extra_refs:
       - org: kubernetes-sigs
         repo: cluster-api-provider-azure
-        base_ref: release-1.10
+        base_ref: release-1.13
         path_alias: sigs.k8s.io/cluster-api-provider-azure
         workdir: true
       - org: kubernetes-sigs
         repo: cloud-provider-azure
-        base_ref: master
+        base_ref: release-1.27
         path_alias: sigs.k8s.io/cloud-provider-azure
         workdir: false
     spec:
       containers:
-        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
+          command:
+            - runner.sh
+            - ./scripts/ci-entrypoint.sh
+          args:
+            - bash
+            - -c
+            - >-
+              cd ${GOPATH}/src/sigs.k8s.io/blob-csi-driver &&
+              make e2e-test
+          securityContext:
+            privileged: true
+          env:
+            - name: EXTERNAL_E2E_TEST_BLOBFUSE
+              value: "true"
+            - name: NODE_MACHINE_TYPE # CAPZ config
+              value: "Standard_D2s_v3"
+            - name: KUBERNETES_VERSION # CAPZ config
+              value: "latest-1.27"
+            - name: ENABLE_BLOBFUSE_PROXY
+              value: "true"
+    annotations:
+      testgrid-dashboards: provider-azure-blobfuse-csi-driver
+      testgrid-tab-name: pr-blob-csi-driver-external-e2e-blobfuse
+      description: "Run External E2E tests for Azure Blob Storage CSI driver using blobfuse v1."
+      testgrid-num-columns-recent: '30'
+  - name: pull-blob-csi-driver-external-e2e-blobfuse-v2
+    decorate: true
+    skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
+    path_alias: sigs.k8s.io/blob-csi-driver
+    labels:
+      preset-dind-enabled: "true"
+      preset-kind-volume-mounts: "true"
+      preset-azure-cred-only: "true"
+      preset-azure-anonymous-pull: "true"
+      preset-azure-capz-sa-cred: "true"
+    extra_refs:
+      - org: kubernetes-sigs
+        repo: cluster-api-provider-azure
+        base_ref: release-1.13
+        path_alias: sigs.k8s.io/cluster-api-provider-azure
+        workdir: true
+      - org: kubernetes-sigs
+        repo: cloud-provider-azure
+        base_ref: release-1.27
+        path_alias: sigs.k8s.io/cloud-provider-azure
+        workdir: false
+    spec:
+      containers:
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
           command:
             - runner.sh
             - ./scripts/ci-entrypoint.sh
@@ -414,10 +339,106 @@ presubmits:
               value: "Standard_D2s_v3"
             - name: KUBERNETES_VERSION # CAPZ config
               value: "latest-1.27"
+            - name: EXTERNAL_E2E_TEST_BLOBFUSE_v2
+              value: "true"
+            - name: ENABLE_BLOBFUSE_PROXY
+              value: "true"
+    annotations:
+      testgrid-dashboards: provider-azure-blobfuse-csi-driver
+      testgrid-tab-name: pr-blob-csi-driver-external-e2e-blobfuse-v2
+      description: "Run External E2E tests for Azure Blob Storage CSI driver using blobfuse v2."
+      testgrid-num-columns-recent: '30'
+  - name: pull-blob-csi-driver-external-e2e-nfs
+    decorate: true
+    skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
+    path_alias: sigs.k8s.io/blob-csi-driver
+    labels:
+      preset-dind-enabled: "true"
+      preset-kind-volume-mounts: "true"
+      preset-azure-cred-only: "true"
+      preset-azure-anonymous-pull: "true"
+      preset-azure-capz-sa-cred: "true"
+    extra_refs:
+      - org: kubernetes-sigs
+        repo: cluster-api-provider-azure
+        base_ref: release-1.13
+        path_alias: sigs.k8s.io/cluster-api-provider-azure
+        workdir: true
+      - org: kubernetes-sigs
+        repo: cloud-provider-azure
+        base_ref: release-1.28
+        path_alias: sigs.k8s.io/cloud-provider-azure
+        workdir: false
+    spec:
+      containers:
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
+          command:
+            - runner.sh
+            - ./scripts/ci-entrypoint.sh
+          args:
+            - bash
+            - -c
+            - >-
+              cd ${GOPATH}/src/sigs.k8s.io/blob-csi-driver &&
+              make e2e-test
+          securityContext:
+            privileged: true
+          env:
+            - name: NODE_MACHINE_TYPE # CAPZ config
+              value: "Standard_D2s_v3"
+            - name: KUBERNETES_VERSION # CAPZ config
+              value: "latest-1.28"
+            - name: EXTERNAL_E2E_TEST_NFS
+              value: "true"
+    annotations:
+      testgrid-dashboards: provider-azure-blobfuse-csi-driver
+      testgrid-tab-name: pr-blob-csi-driver-external-e2e-nfs
+      description: "Run External E2E tests for Azure Blob Storage CSI driver using nfs."
+      testgrid-num-columns-recent: '30'
+  - name: pull-blob-csi-driver-e2e
+    decorate: true
+    skip_if_only_changed: "^docs/|^site/|^\\.github/|\\.(md|adoc)$|^(README|LICENSE)$"
+    path_alias: sigs.k8s.io/blob-csi-driver
+    labels:
+      preset-dind-enabled: "true"
+      preset-kind-volume-mounts: "true"
+      preset-azure-cred-only: "true"
+      preset-azure-anonymous-pull: "true"
+      preset-azure-capz-sa-cred: "true"
+    extra_refs:
+      - org: kubernetes-sigs
+        repo: cluster-api-provider-azure
+        base_ref: release-1.13
+        path_alias: sigs.k8s.io/cluster-api-provider-azure
+        workdir: true
+      - org: kubernetes-sigs
+        repo: cloud-provider-azure
+        base_ref: release-1.28
+        path_alias: sigs.k8s.io/cloud-provider-azure
+        workdir: false
+    spec:
+      containers:
+        - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
+          command:
+            - runner.sh
+            - ./scripts/ci-entrypoint.sh
+          args:
+            - bash
+            - -c
+            - >-
+              cd ${GOPATH}/src/sigs.k8s.io/blob-csi-driver &&
+              make e2e-test
+          securityContext:
+            privileged: true
+          env:
+            - name: NODE_MACHINE_TYPE # CAPZ config
+              value: "Standard_D2s_v3"
+            - name: KUBERNETES_VERSION # CAPZ config
+              value: "latest-1.28"
             - name: DISABLE_ZONE
               value: "true"
     annotations:
       testgrid-dashboards: provider-azure-blobfuse-csi-driver
-      testgrid-tab-name: pr-blob-csi-driver-e2e-capz
+      testgrid-tab-name: pr-blob-csi-driver-e2e
       description: "Run E2E tests on a capz cluster for Blob CSI driver."
       testgrid-num-columns-recent: '30'

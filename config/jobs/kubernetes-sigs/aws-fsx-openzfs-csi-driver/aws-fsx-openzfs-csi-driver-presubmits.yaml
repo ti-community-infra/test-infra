@@ -10,7 +10,7 @@ presubmits:
       preset-service-account: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         args:
@@ -24,11 +24,12 @@ presubmits:
             cpu: 2
             memory: 4Gi
     annotations:
-      testgrid-dashboards: provider-aws-fsx-openzfs-csi-driver
-      testgrid-tab-name: unit-test
+      testgrid-dashboards: provider-aws-fsx-openzfs-csi-driver, amazon-ec2-presubmits
+      testgrid-tab-name: unit-fsx-openzfs-test
       description: aws fsx openzfs csi driver unit test
       testgrid-num-columns-recent: '30'
   - name: pull-aws-fsx-openzfs-csi-driver-sanity
+    cluster: eks-prow-build-cluster
     always_run: true
     decorate: true
     skip_branches:
@@ -36,10 +37,10 @@ presubmits:
     labels:
       preset-service-account: "true"
       preset-dind-enabled: "true"
-      preset-aws-credential-aws-oss-testing: "true"
+      preset-aws-credential-aws-shared-testing: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         args:
@@ -55,7 +56,7 @@ presubmits:
             cpu: 2
             memory: 4Gi
     annotations:
-      testgrid-dashboards: provider-aws-fsx-openzfs-csi-driver
+      testgrid-dashboards: provider-aws-fsx-openzfs-csi-driver, amazon-ec2-presubmits
       testgrid-tab-name: sanity-test
       description: aws fsx openzfs csi driver sanity test
       testgrid-num-columns-recent: '30'

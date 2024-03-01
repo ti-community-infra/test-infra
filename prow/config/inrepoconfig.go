@@ -47,22 +47,10 @@ var inrepoconfigRepoOpts = git.RepoOpts{
 	// Technically we only need inRepoConfigDirName (".prow") because the
 	// default "cone mode" of sparse checkouts already include files at the
 	// toplevel (which would include ".prow.yaml").
-	//
-	// TODO (listx): The version of git shipped in kubekins-e2e (itself
-	// derived from the bootstrap image) uses git version 2.30.2, which does
-	// not populate files at the toplevel. So we have to also set a sparse
-	// checkout of ".prow.yaml". Later when that image is updated, we can
-	// remove the use of inRepoConfigFileName (".prow.yaml"), so that the
-	// unit tests in CI can pass. As for the Prow components themselves,
-	// they use a different version of Git based on alpine (see .ko.yaml in
-	// the root).
-	SparseCheckoutDirs: []string{inRepoConfigDirName, inRepoConfigFileName},
+	SparseCheckoutDirs: []string{inRepoConfigDirName},
 	// The sparse checkout would avoid creating another copy of Git objects
 	// from the mirror clone into the secondary clone.
-	ShareObjectsWithSourceRepo: true,
-	// Disable fetching tag objects, because they are redundant and useless (we
-	// already have baseSHA and headSHAs).
-	NoFetchTags: true,
+	ShareObjectsWithPrimaryClone: true,
 }
 
 var inrepoconfigMetrics = struct {
@@ -108,12 +96,25 @@ type ProwYAML struct {
 
 // ProwYAMLGetter is used to retrieve a ProwYAML. Tests should provide
 // their own implementation and set that on the Config.
-type ProwYAMLGetter func(c *Config, gc git.ClientFactory, identifier, baseSHA string, headSHAs ...string) (*ProwYAML, error)
+type ProwYAMLGetter func(c *Config, gc git.ClientFactory, identifier, baseBranch, baseSHA string, headSHAs ...string) (*ProwYAML, error)
 
 // Verify prowYAMLGetterWithDefaults and prowYAMLGetter are both of type
 // ProwYAMLGetter.
 var _ ProwYAMLGetter = prowYAMLGetterWithDefaults
 var _ ProwYAMLGetter = prowYAMLGetter
+
+// InRepoConfigGetter defines a common interface that both the Moonraker client
+// and raw InRepoConfigCache can implement. This way, Prow components like Sub
+// and Gerrit can choose either one (based on runtime flags), but regardless of
+// the choice the surrounding code can still just call this GetProwYAML()
+// interface method (without being aware whether the underlying implementation
+// is going over the network to Moonraker or is done locally with the local
+// InRepoConfigCache (LRU cache)).
+type InRepoConfigGetter interface {
+	GetInRepoConfig(identifier, baseBranch string, baseSHAGetter RefGetter, headSHAGetters ...RefGetter) (*ProwYAML, error)
+	GetPresubmits(identifier, baseBranch string, baseSHAGetter RefGetter, headSHAGetters ...RefGetter) ([]Presubmit, error)
+	GetPostsubmits(identifier, baseBranch string, baseSHAGetter RefGetter, headSHAGetters ...RefGetter) ([]Postsubmit, error)
+}
 
 // prowYAMLGetter is like prowYAMLGetterWithDefaults, but without default values
 // (it does not call DefaultAndValidateProwYAML()). Its sole purpose is to allow
@@ -125,6 +126,7 @@ func prowYAMLGetter(
 	c *Config,
 	gc git.ClientFactory,
 	identifier string,
+	baseBranch string,
 	baseSHA string,
 	headSHAs ...string) (*ProwYAML, error) {
 
@@ -144,8 +146,11 @@ func prowYAMLGetter(
 	repoOpts := inrepoconfigRepoOpts
 	// For Gerrit, the baseSHA could appear as a headSHA for postsubmits if the
 	// change was a fast-forward merge. So we need to dedupe it with sets.
-	repoOpts.FetchCommits = sets.New(baseSHA)
-	repoOpts.FetchCommits.Insert(headSHAs...)
+	repoOpts.NeededCommits = sets.New(baseSHA)
+	repoOpts.NeededCommits.Insert(headSHAs...)
+	if baseBranch != "" {
+		repoOpts.BranchesToRetarget = map[string]string{baseBranch: baseSHA}
+	}
 	repo, err := gc.ClientForWithRepoOpts(orgRepo.Org, orgRepo.Repo, repoOpts)
 	inrepoconfigMetrics.gitCloneDuration.WithLabelValues(orgRepo.Org, orgRepo.Repo).Observe((float64(time.Since(timeBeforeClone).Seconds())))
 	if err != nil {
@@ -264,10 +269,11 @@ func prowYAMLGetterWithDefaults(
 	c *Config,
 	gc git.ClientFactory,
 	identifier string,
+	baseBranch string,
 	baseSHA string,
 	headSHAs ...string) (*ProwYAML, error) {
 
-	prowYAML, err := prowYAMLGetter(c, gc, identifier, baseSHA, headSHAs...)
+	prowYAML, err := prowYAMLGetter(c, gc, identifier, baseBranch, baseSHA, headSHAs...)
 	if err != nil {
 		return nil, err
 	}

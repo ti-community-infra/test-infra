@@ -34,7 +34,7 @@ presubmits:
       testgrid-tab-name: pull-kubernetes-e2e-gce-100-performance
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
@@ -118,7 +118,7 @@ presubmits:
       testgrid-tab-name: pull-kubernetes-e2e-gce-big-performance
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
@@ -185,7 +185,7 @@ presubmits:
       testgrid-tab-name: pull-kubernetes-e2e-gce-correctness
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
@@ -251,7 +251,7 @@ presubmits:
       testgrid-tab-name: pull-kubernetes-e2e-gce-large-performance
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
@@ -273,8 +273,9 @@ presubmits:
         - --env=CL2_LOAD_TEST_THROUGHPUT=50
         - --env=CL2_DELETE_TEST_THROUGHPUT=50
         - --env=CL2_RATE_LIMIT_POD_CREATION=false
+        - --env=KUBE_CONTROLLER_MANAGER_TEST_ARGS=--endpointslice-updates-batch-period=500ms --endpoint-updates-batch-period=500ms
         # Overrides CONTROLLER_MANAGER_TEST_ARGS from preset-e2e-scalability-periodics.
-        - --env=CONTROLLER_MANAGER_TEST_ARGS=--profiling --contention-profiling --kube-api-qps=100 --kube-api-burst=100 --endpointslice-updates-batch-period=500ms --endpoint-updates-batch-period=500ms
+        - --env=CONTROLLER_MANAGER_TEST_ARGS=--profiling --contention-profiling --kube-api-qps=100 --kube-api-burst=100
         # Overrides SCHEDULER_TEST_ARGS from preset-e2e-scalability-periodics.
         # TODO(#1311): Clean this up after the experiment - it should allow
         #   to hugely decrease pod-startup-latency across the whole test.
@@ -350,7 +351,7 @@ presubmits:
       testgrid-tab-name: pull-kubernetes-kubemark-e2e-gce-big
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
@@ -359,13 +360,14 @@ presubmits:
         - --cluster=
         - --extract=local
         - --flush-mem-after-build=true
-        - --gcp-master-size=n1-standard-4
+        - --gcp-master-size=n2-standard-4
         - --gcp-node-size=e2-standard-8
         - --gcp-nodes=7
         - --gcp-project-type=scalability-project
         - --gcp-zone=us-east1-b
         - --kubemark
         - --kubemark-nodes=500
+        - --kubemark-master-size=n2-standard-16
         - --env=KUBEMARK_APISERVER_TEST_ARGS=--max-requests-inflight=160 --max-mutating-requests-inflight=0 --profiling --contention-profiling
         - --provider=gce
         - --stage=gs://kubernetes-release-pull/ci/pull-kubernetes-kubemark-e2e-gce-big
@@ -439,7 +441,7 @@ presubmits:
       testgrid-tab-name: pull-kubernetes-kubemark-e2e-gce-scale
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
@@ -454,6 +456,7 @@ presubmits:
         - --gcp-zone=us-east1-b
         - --kubemark
         - --kubemark-nodes=5000
+        - --kubemark-master-size=n2-standard-64
         - --provider=gce
         - --stage=gs://kubernetes-release-pull/ci/pull-kubernetes-kubemark-e2e-gce-scale
         # With APF only sum of --max-requests-inflight and --max-mutating-requests-inflight matters, so set --max-mutating-requests-inflight to 0.
@@ -492,6 +495,7 @@ presubmits:
 
   kubernetes/perf-tests:
   - name: pull-perf-tests-benchmark-kube-dns
+    cluster: k8s-infra-prow-build
     always_run: false
     skip_report: false
     max_concurrency: 3
@@ -515,7 +519,7 @@ presubmits:
     run_if_changed: ^dns/.*$
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
@@ -533,8 +537,16 @@ presubmits:
         - --test-cmd-args=$(ARTIFACTS)
         - --test-cmd-name=KubeDnsBenchmark
         - --timeout=120m
+        resources:
+          limits:
+            cpu: 4
+            memory: "12Gi"
+          requests:
+            cpu: 4
+            memory: "12Gi"
 
   - name: pull-perf-tests-clusterloader2
+    cluster: k8s-infra-prow-build
     always_run: false
     skip_report: false
     max_concurrency: 3
@@ -561,7 +573,7 @@ presubmits:
     run_if_changed: ^clusterloader2/.*$
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
@@ -570,7 +582,7 @@ presubmits:
         - --env=HEAPSTER_MACHINE_TYPE=e2-standard-8
         - --extract=ci/latest
         - --gcp-nodes=100
-        - --gcp-project-type=scalability-presubmit-project
+        - --gcp-project-type=scalability-project
         - --gcp-zone=us-east1-b
         - --provider=gce
         - --tear-down-previous
@@ -605,6 +617,7 @@ presubmits:
             memory: "6Gi"
 
   - name: pull-perf-tests-clusterloader2-kubemark
+    cluster: k8s-infra-prow-build
     always_run: false
     skip_report: false
     max_concurrency: 3
@@ -632,20 +645,21 @@ presubmits:
     run_if_changed: ^clusterloader2/.*$
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
         args:
         - --cluster=
         - --extract=ci/latest
-        - --gcp-master-size=n1-standard-2
+        - --gcp-master-size=n2-standard-2
         - --gcp-node-size=e2-standard-4
         - --gcp-nodes=4
-        - --gcp-project-type=scalability-presubmit-project
+        - --gcp-project-type=scalability-project
         - --gcp-zone=us-east1-b
         - --kubemark
         - --kubemark-nodes=100
+        - --kubemark-master-size=n2-standard-8
         - --env=KUBEMARK_APISERVER_TEST_ARGS=--max-requests-inflight=80 --max-mutating-requests-inflight=0 --profiling --contention-profiling
         - --provider=gce
         - --tear-down-previous
@@ -681,6 +695,7 @@ presubmits:
 
   # Fork of kubernetes/kubernetes: pull-kubernetes-e2e-gce-scale-performance-manual
   - name: pull-perf-tests-clusterloader2-e2e-gce-scale-performance-manual
+    cluster: k8s-infra-prow-build
     always_run: false
     max_concurrency: 1
     branches:
@@ -705,7 +720,7 @@ presubmits:
       testgrid-tab-name: pull-perf-tests-clusterloader2-e2e-gce-scale-performance
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         - /workspace/scenarios/kubernetes_e2e.py
@@ -715,10 +730,10 @@ presubmits:
         # TODO(mborsz): Adjust or remove this change once we understand coredns
         # memory usage regression.
         - --env=KUBE_DNS_MEMORY_LIMIT=300Mi
-        - --extract=ci/latest-fast
+        - --extract=ci/fast/latest-fast
         - --extract-ci-bucket=k8s-release-dev
         - --gcp-nodes=5000
-        - --gcp-project-type=scalability-presubmit-5k-project
+        - --gcp-project-type=scalability-scale-project
         - --gcp-zone=us-east1-b
         - --provider=gce
         - --metadata-sources=cl2-metadata.json
@@ -757,8 +772,6 @@ presubmits:
         - --test-cmd-args=--testoverrides=./testing/overrides/5000_nodes.yaml
         - --test-cmd-name=ClusterLoaderV2
         - --timeout=420m
-        - --use-logexporter
-        - --logexporter-gcs-path=gs://sig-scalability-logs/$(JOB_NAME)/$(BUILD_ID)
         resources:
           limits:
             # Using 6 CPU to speed up bazel build phase (4 is enough for the test itself)
@@ -771,6 +784,7 @@ presubmits:
           privileged: true
 
   - name: pull-perf-tests-util-images
+    cluster: k8s-infra-prow-build
     always_run: false
     skip_report: false
     max_concurrency: 10
@@ -789,7 +803,7 @@ presubmits:
       testgrid-tab-name: pull-perf-tests-util-images
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/bootstrap:v20230316-ac3134cff2
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
         command:
         - runner.sh
         args:
@@ -806,6 +820,7 @@ presubmits:
             memory: "2Gi"
 
   - name: pull-perf-tests-verify-all-python
+    cluster: k8s-infra-prow-build
     decorate: true
     always_run: true
     skip_branches:
@@ -830,6 +845,7 @@ presubmits:
               memory: "2Gi"
 
   - name: pull-perf-tests-verify-test
+    cluster: k8s-infra-prow-build
     decorate: true
     always_run: true
     skip_branches:
@@ -852,6 +868,7 @@ presubmits:
             memory: "2Gi"
 
   - name: pull-perf-tests-verify-dashboard
+    cluster: k8s-infra-prow-build
     decorate: true
     run_if_changed: ^clusterloader2/pkg/prometheus/manifests/dashboards/.*\.json$
     skip_branches:
@@ -876,6 +893,7 @@ presubmits:
             memory: "2Gi"
 
   - name: pull-perf-tests-verify-lint
+    cluster: k8s-infra-prow-build
     decorate: true
     always_run: true
     skip_branches:

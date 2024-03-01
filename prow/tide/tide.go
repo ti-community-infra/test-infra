@@ -24,13 +24,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/prometheus/client_golang/prometheus"
 	githubql "github.com/shurcooL/githubv4"
@@ -1552,9 +1553,10 @@ func (c *syncController) presubmitsByPull(sp *subpool) (map[int][]config.Presubm
 
 	for _, pr := range sp.prs {
 		log := c.logger.WithField("base-sha", sp.sha).WithFields(pr.logFields())
-		presubmitsForPull, err := c.provider.GetPresubmits(sp.org+"/"+sp.repo, refGetterFactory(sp.sha), refGetterFactory(pr.HeadRefOID))
+		requireManuallyTriggeredJobs := requireManuallyTriggeredJobs(c.config(), sp.org, sp.repo, pr.BaseRefName)
+		presubmitsForPull, err := c.provider.GetPresubmits(sp.org+"/"+sp.repo, pr.BaseRefName, refGetterFactory(sp.sha), refGetterFactory(pr.HeadRefOID))
 		if err != nil {
-			c.logger.WithError(err).Debug("Failed to get presubmits for PR, excluding from subpool")
+			log.WithError(err).Debug("Failed to get presubmits for PR, excluding from subpool")
 			continue
 		}
 		filteredPRs = append(filteredPRs, pr)
@@ -1570,7 +1572,8 @@ func (c *syncController) presubmitsByPull(sp *subpool) (map[int][]config.Presubm
 			// - Brancher
 			// - RunBeforeMerge
 			// - Files changed
-			shouldRun, err := ps.ShouldRun(sp.branch, c.changedFiles.prChanges(&pr), ps.RunBeforeMerge, false)
+			forceRun := (requireManuallyTriggeredJobs && ps.ContextRequired() && ps.NeedsExplicitTrigger()) || ps.RunBeforeMerge
+			shouldRun, err := ps.ShouldRun(sp.branch, c.changedFiles.prChanges(&pr), forceRun, false)
 			if err != nil {
 				return nil, err
 			}
@@ -1581,6 +1584,7 @@ func (c *syncController) presubmitsByPull(sp *subpool) (map[int][]config.Presubm
 
 			presubmits[pr.Number] = append(presubmits[pr.Number], ps)
 		}
+		log.WithField("required-presubmit-count", len(presubmits[pr.Number])).Debug("Determined required presubmits for PR.")
 	}
 
 	sp.prs = filteredPRs
@@ -1605,11 +1609,13 @@ func (c *syncController) presubmitsForBatch(prs []CodeReviewCommon, org, repo, b
 		headRefGetters = append(headRefGetters, refGetterFactory(pr.HeadRefOID))
 	}
 
-	presubmits, err := c.provider.GetPresubmits(org+"/"+repo, refGetterFactory(baseSHA), headRefGetters...)
+	presubmits, err := c.provider.GetPresubmits(org+"/"+repo, baseBranch, refGetterFactory(baseSHA), headRefGetters...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get presubmits for batch: %w", err)
 	}
 	log.Debugf("Found %d possible presubmits for batch", len(presubmits))
+
+	requireManuallyTriggeredJobs := requireManuallyTriggeredJobs(c.config(), org, repo, baseBranch)
 
 	var result []config.Presubmit
 	for _, ps := range presubmits {
@@ -1621,7 +1627,8 @@ func (c *syncController) presubmitsForBatch(prs []CodeReviewCommon, org, repo, b
 			continue
 		}
 
-		shouldRun, err := ps.ShouldRun(baseBranch, c.changedFiles.batchChanges(prs), ps.RunBeforeMerge, false)
+		forceRun := (requireManuallyTriggeredJobs && ps.ContextRequired() && ps.NeedsExplicitTrigger()) || ps.RunBeforeMerge
+		shouldRun, err := ps.ShouldRun(baseBranch, c.changedFiles.batchChanges(prs), forceRun, false)
 		if err != nil {
 			return nil, err
 		}
@@ -2292,4 +2299,16 @@ func getBetterSimpleState(a, b simpleState) simpleState {
 
 	// a must be pending and b can not be success, so b can't be better than a
 	return a
+}
+
+func requireManuallyTriggeredJobs(c *config.Config, org, repo, branch string) bool {
+	options := config.ParseTideContextPolicyOptions(org, repo, branch, c.Tide.ContextOptions)
+	if options.FromBranchProtection != nil && *options.FromBranchProtection {
+		if b, err := c.BranchProtection.GetOrg(org).GetRepo(repo).GetBranch(branch); err == nil {
+			if policy, err := c.GetPolicy(org, repo, branch, *b, []config.Presubmit{}, nil); err == nil && policy != nil {
+				return policy.RequireManuallyTriggeredJobs != nil && *policy.RequireManuallyTriggeredJobs
+			}
+		}
+	}
+	return false
 }

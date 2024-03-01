@@ -4,7 +4,7 @@ presubmits:
       labels:
         preset-dind-enabled: "true"
         preset-kind-volume-mounts: "true"
-        preset-cluster-api-provider-vsphere-e2e-config: "true"
+        preset-image-builder-vsphere-e2e-config: "true"
       decorate: true
       decoration_config:
         timeout: 1h
@@ -13,7 +13,7 @@ presubmits:
       max_concurrency: 3
       spec:
         containers:
-          - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+          - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
             args:
               - runner.sh
               - "./images/capi/scripts/ci-ova.sh"

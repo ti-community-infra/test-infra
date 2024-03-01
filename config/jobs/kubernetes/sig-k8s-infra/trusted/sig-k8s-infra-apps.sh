@@ -33,9 +33,7 @@ readonly APPS=(
     perfdash
     prow
     publishing-bot
-    sippy
     slack-infra
-    triageparty-release
 )
 
 cat >"${OUTPUT}" <<EOF

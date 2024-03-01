@@ -495,6 +495,12 @@ default:
       prowPlugin: label
       addedBy: anyone
     - color: d2b48c
+      description: Categorizes an issue or PR as relevant to SIG Etcd.
+      name: sig/etcd
+      target: both
+      prowPlugin: label
+      addedBy: anyone
+    - color: d2b48c
       description: Categorizes an issue or PR as relevant to SIG Instrumentation.
       name: sig/instrumentation
       target: both
@@ -959,12 +965,6 @@ repos:
         previously:
           - name: area/infra/publishing-bot
       - color: 0052cc
-        description: sippy.k8s.io, code in apps/sippy/
-        name: area/apps/sippy
-        target: both
-        prowPlugin: label
-        addedBy: anyone
-      - color: 0052cc
         description: slack.k8s.io, slack-infra, code in apps/slack-infra
         name: area/apps/slack-infra
         target: both
@@ -1093,6 +1093,11 @@ repos:
         addedBy: anyone
         previously:
           - name: area/infra/terraform
+      - color: 0ffa16
+        description: Indicates a PR is trusted, used by tide for auto-merging PRs.
+        name: skip-review
+        target: prs
+        addedBy: autobump bot
   kubernetes/kubernetes:
     labels:
       - color: 0052cc
@@ -1134,6 +1139,16 @@ repos:
       - color: 0052cc
         description: Issues or PRs related to Network Policy subproject
         name: area/network-policy
+        target: both
+        addedBy: label
+      - color: 0052cc
+        description: Issues or PRs related to Node lifecycle
+        name: area/node-lifecycle
+        target: both
+        addedBy: label
+      - color: 0052cc
+        description: Issues or PRs related to Pod lifecycle
+        name: area/pod-lifecycle
         target: both
         addedBy: label
       - color: 0052cc
@@ -1681,6 +1696,12 @@ repos:
         addedBy: anyone
   kubernetes-sigs/cluster-api:
     labels:
+      - color: d455d0
+        description: Indicates an issue or PR that needs further discussion before being actively worked on.
+        name: triage/needs-discussion
+        target: both
+        prowPlugin: label
+        addedBy: org members
       - color: c7def8
         description: Issues or PRs related to proposals.
         name: kind/proposal
@@ -2127,6 +2148,12 @@ repos:
         name: kind/user-story
         target: issues
         addedBy: humans
+      - color: c7def8
+        description: PRs related to Gateway Enhancement Proposal(GEP)
+        name: kind/gep
+        prowPlugin: label
+        target: prs
+        addedBy: anyone
   kubernetes-sigs/kind:
     labels:
       - color: 19abff

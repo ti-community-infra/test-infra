@@ -5,7 +5,7 @@ Use this image when you want to use `gcloud` and `terraform` in the same job
 ## contents
 
 - base:
-  - `gcr.io/k8s-prow/alpine:v20210618-2814345`
+  - `gcr.io/k8s-prow/alpine:v20240108-a28886d2bd`
 - directories:
   - `/workspace` default working dir for `run` commands
 - languages:

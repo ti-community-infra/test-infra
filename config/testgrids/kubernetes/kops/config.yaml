@@ -21,17 +21,18 @@ dashboard_groups:
   - kops-distro-rocky8
   - kops-distro-u2004
   - kops-distro-u2204
-  - kops-k8s-1.24
+  - kops-distro-cos105
   - kops-k8s-1.25
   - kops-k8s-1.26
   - kops-k8s-1.27
   - kops-k8s-1.28
+  - kops-k8s-1.29
   - kops-k8s-ci
   - kops-k8s-latest
   - kops-k8s-stable
-  - kops-1.26
   - kops-1.27
   - kops-1.28
+  - kops-1.29
   - kops-latest
   - kops-upgrades
   - kops-upgrades-many-addons
@@ -57,17 +58,18 @@ dashboards:
 - name: kops-distro-rocky8
 - name: kops-distro-u2004
 - name: kops-distro-u2204
-- name: kops-k8s-1.24
+- name: kops-distro-cos105
 - name: kops-k8s-1.25
 - name: kops-k8s-1.26
 - name: kops-k8s-1.27
 - name: kops-k8s-1.28
+- name: kops-k8s-1.29
 - name: kops-k8s-ci
 - name: kops-k8s-latest
 - name: kops-k8s-stable
-- name: kops-1.26
 - name: kops-1.27
 - name: kops-1.28
+- name: kops-1.29
 - name: kops-latest
 - name: kops-upgrades
 - name: kops-upgrades-many-addons

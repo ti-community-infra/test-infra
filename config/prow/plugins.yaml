@@ -18,7 +18,6 @@ triggers:
   only_org_members: true
 - repos:
   - google/cadvisor
-  - GoogleCloudPlatform/k8s-multicluster-ingress
   join_org_url: "https://git.k8s.io/community/community-membership.md#member"
 - repos:
   - containerd/cri
@@ -28,7 +27,9 @@ triggers:
   join_org_url: "https://github.com/containerd/project/blob/main/MAINTAINERS"
   trigger_github_workflows: true
 - repos:
-  - bazelbuild
+  - etcd-io
+  join_org_url: "https://github.com/etcd-io/etcd/blob/main/CONTRIBUTING.md"
+  trigger_github_workflows: true
 - repos:
   - kubernetes/utils
   join_org_url: "https://git.k8s.io/community/community-membership.md#member"
@@ -235,6 +236,7 @@ lgtm:
   - kubernetes-sigs/kubetest2
   - kubernetes-sigs/mdtoc
   - kubernetes-sigs/prow
+  - kubernetes-sigs/release-actions
   - kubernetes-sigs/release-notes
   - kubernetes-sigs/release-sdk
   - kubernetes-sigs/release-utils
@@ -244,6 +246,7 @@ lgtm:
   - kubernetes/cloud-provider-aws
   - kubernetes/k8s.io
   - kubernetes/kops
+  - kubernetes/publishing-bot
   - kubernetes/release
   - kubernetes/repo-infra
   - kubernetes/sig-release
@@ -257,6 +260,9 @@ lgtm:
   - kubernetes-sigs/cluster-api-operator
   - kubernetes-sigs/cluster-api-provider-azure
   - kubernetes-sigs/cluster-api-provider-vsphere
+  - kubernetes-sigs/controller-runtime
+  - kubernetes-sigs/controller-tools
+  - kubernetes-sigs/kueue
   store_tree_hash: true
 
 blockades:
@@ -313,13 +319,6 @@ blockades:
   exceptionregexps:
   - ^README\.md$
   explanation: "We do not accept changes directly against this repository, unless the change is to the `README.md` itself. Please see `CONTRIBUTING.md` for information on where and how to contribute instead."
-- repos:
-  - kubernetes/test-infra
-  blockregexps:
-  - ^prow/.+\.md$
-  exceptionregexps:
-  - ^prow/(ANNOUNCEMENTS|README)\.md$
-  explanation: "All Prow documentation (Markdown files) have moved to https://github.com/kubernetes-sigs/prow as part of https://github.com/kubernetes-sigs/prow/issues/4. Instructions for updating existing docs are at https://docs.prow.k8s.io/docs/contribution-guidelines/#updating-existing-docs."
 - repos:
   - kubernetes/k8s.io
   blockregexps:
@@ -457,29 +456,28 @@ slack:
 
 milestone_applier:
   kubernetes/enhancements:
-    master: v1.29
+    master: v1.30
   kubernetes/kubernetes:
-    master: v1.29
+    master: v1.30
+    release-1.29: v1.29
     release-1.28: v1.28
     release-1.27: v1.27
     release-1.26: v1.26
-    release-1.25: v1.25
-    release-1.24: v1.24
-    release-1.23: v1.23
   kubernetes/org:
-    main: v1.29
+    main: v1.30
   kubernetes/release:
-    master: v1.29
+    master: v1.30
   kubernetes/sig-release:
-    master: v1.29
+    master: v1.30
   kubernetes/test-infra:
-    master: v1.29
+    master: v1.30
   kubernetes-sigs/kueue:
-    main: v0.5
-    release-0.3: v0.3
+    main: v0.7
     release-0.4: v0.4
+    release-0.5: v0.5
+    release-0.6: v0.6
   kubernetes/k8s.io:
-    main: v1.29
+    main: v1.30
   kubernetes/kops:
     master: v1.29
     release-1.28: v1.28
@@ -496,7 +494,8 @@ milestone_applier:
     release-1.17: v1.17
     release-1.16: v1.16
   kubernetes-sigs/cluster-api:
-    main: v1.6
+    main: v1.7
+    release-1.6: v1.6
     release-1.5: v1.5
     release-1.4: v1.4
     release-1.3: v1.3
@@ -511,9 +510,9 @@ milestone_applier:
     release-0.7: v0.7.x
     release-0.6: v0.6.x
   kubernetes-sigs/cluster-api-provider-azure:
-    main: v1.11
-    release-1.10: v1.10
-    release-1.9: v1.9
+    main: v1.14
+    release-1.13: v1.13
+    release-1.12: v1.12
   kubernetes-sigs/cluster-api-provider-digitalocean:
     main: v1.1.0
     release-1.0: v1.0.0
@@ -524,7 +523,8 @@ milestone_applier:
     release-0.4: v0.4
     release-0.3: v0.3
   kubernetes-sigs/cluster-api-provider-vsphere:
-    main: v1.9
+    main: v1.10
+    release-1.9: v1.9
     release-1.8: v1.8
     release-1.7: v1.7
     release-1.6: v1.6
@@ -534,7 +534,7 @@ milestone_applier:
   kubernetes-sigs/boskos:
     master: v1.23
   kubernetes/website:
-    dev-1.29: 1.29
+    dev-1.30: 1.30
 
 repo_milestone:
   # Default maintainer
@@ -875,13 +875,11 @@ require_matching_label:
   repo: cluster-api
   issues: true
   prs: false
-  regexp: ^triage/accepted$
+  regexp: ^triage/
   missing_comment: |
     This issue is currently awaiting triage.
 
-    If CAPI contributors determines this is a relevant issue, they will accept it by applying the `triage/accepted` label and provide further guidance.
-
-    The `triage/accepted` label can be added by org members by writing `/triage accepted` in a comment.
+    CAPI contributors will take a look as soon as possible, apply one of the [`triage/*`](https://github.com/kubernetes-sigs/cluster-api/labels?q=triage%2F) labels and provide further guidance.
 - missing_label: needs-triage
   org: kubernetes-sigs
   repo: cluster-api-operator
@@ -1094,30 +1092,23 @@ cherry_pick_unapproved:
 
     For details on the patch release process and schedule, see the [Patch Releases](https://k8s.io/releases/patch-releases) page.
 
+cherry_pick_approved:
+- org: kubernetes
+  repo: kubernetes
+  approvers: # List taken from: https://github.com/kubernetes/kubernetes/blob/a8f6ea24209b332217f7baa7c14248e8d0266d28/OWNERS_ALIASES#L101-L108
+  - cpanato
+  - jeremyrickard
+  - justaugustus
+  - palnabarun
+  - puerco
+  - saschagrunert
+  - Verolop
+  - xmudrii
+
 # Enabled plugins per repo.
 # Keys: Full repo name: "org/repo".
 # Values: List of plugins to run against the repo.
 plugins:
-  # Enable the following for any bazelbuild repo (rules_k8s, rules_docker) that sends prow webhooks
-  # Repos that do not send prow webhooks will see no effect.
-  bazelbuild:
-    plugins:
-    - approve  # Allow OWNERS to /approve
-    - assign  # Allow /assign and /cc
-    - blunderbuss  # Auto-assign people
-    - cat # /meow replies with cat pictures
-    - dog # /bark replies with dog pictures
-    - help  # Support /help and /good-first-issue
-    - hold  # Support /hold to delay merge
-    - lgtm  # Allow /lgtm
-    - lifecycle  # Allow /lifecycle stale
-    - override
-    - size  # Auto-label size of PR
-    - trigger  # Allow people to configure CI jobs to /test
-    - verify-owners # Validates OWNERS file changes in PRs.
-    - wip  # Auto-hold PRs with WIP in title
-    - yuks # Let prow tell a /joke
-
   google/cadvisor:
     plugins:
     - trigger
@@ -1221,6 +1212,7 @@ plugins:
   kubernetes/kubernetes:
     plugins:
     - blockade
+    - cherry-pick-approved
     - cherry-pick-unapproved
     - mergecommitblocker
     - milestone
@@ -1402,6 +1394,10 @@ plugins:
     - milestone
     - override
 
+  kubernetes-sigs/kernel-module-management:
+    plugins:
+    - override
+
   kubernetes-sigs/kind:
     plugins:
     - override
@@ -1558,25 +1554,25 @@ plugins:
     - size
     - trigger
 
+  etcd-io:
+    plugins:
+    - assign
+    - trigger
+    - label
+    - pony
+    - retitle
+    - skip
+    - wip
+    - yuks
+
   containerd/containerd:
     plugins:
     - assign  # Allow /assign and /cc
     - trigger # Allow people to configure CI jobs to /test
-
-  GoogleCloudPlatform/k8s-multicluster-ingress:
-    plugins:
-    - trigger
-
-  GoogleCloudPlatform/k8s-cluster-bundle:
-    plugins:
-    - trigger
-    - lgtm
-    - size
-    - welcome
-
-  cncf/apisnoop:
-    plugins:
-    - trigger # prow.k8s.io for #sig-arch + release-informing jobs... prow.cncf.io for cncf/k8s-conformance related jobs
+    - label   # Allow people to label issues and PRs
+    - mergecommitblocker # Mark PRs with merge commits
+    - size    # Mark size of PRs
+    - wip     # Mark draft PRs
 
   kubernetes-sigs/secrets-store-csi-driver:
     plugins:
@@ -1636,6 +1632,12 @@ external_plugins:
     - pull_request
     endpoint: http://cherrypicker
   kubernetes/cloud-provider-openstack:
+  - name: cherrypicker
+    events:
+    - issue_comment
+    - pull_request
+    endpoint: http://cherrypicker
+  kubernetes/cloud-provider-vsphere:
   - name: cherrypicker
     events:
     - issue_comment
@@ -1770,6 +1772,12 @@ external_plugins:
       - issue_comment
       - pull_request
     endpoint: http://cherrypicker
+  kubernetes-sigs/kernel-module-management:
+  - name: cherrypicker
+    events:
+    - issue_comment
+    - pull_request
+    endpoint: http://cherrypicker
   kubernetes-sigs/kueue:
   - name: cherrypicker
     events:
@@ -1848,3 +1856,12 @@ external_plugins:
     - issue_comment
     - pull_request
     endpoint: http://cherrypicker
+  containerd/containerd:
+  - name: needs-rebase
+    events:
+    - issue_comment
+    - pull_request
+  - name: cherrypicker
+    events:
+    - issue_comment
+    - pull_request

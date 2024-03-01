@@ -53,12 +53,9 @@ var k8sProw = flag.Bool("k8s-prow", true, "If the config is for k8s prow cluster
 // Loaded at TestMain.
 var c *cfg.Config
 
+// TODO: (rjsadow) figure out a better way to incorporate all/any community clusters
 func isCritical(clusterName string) bool {
-	return clusterName == "k8s-infra-prow-build"
-}
-
-func isEKSCluster(clusterName string) bool {
-	return clusterName == "eks-prow-build-cluster"
+	return clusterName == "k8s-infra-prow-build" || clusterName == "eks-prow-build-cluster"
 }
 
 func TestMain(m *testing.M) {
@@ -706,7 +703,7 @@ func checkKubekinsPresets(jobName string, spec *coreapi.PodSpec, labels map[stri
 			}
 		}
 
-		if scenario == "kubenetes_e2e" {
+		if scenario == "kubernetes_e2e" {
 			ssh = false
 			for key, val := range labels {
 				if (key == "preset-k8s-ssh" || key == "preset-aws-ssh") && val == "true" {
@@ -791,6 +788,13 @@ func hasArg(wanted string, args []string) bool {
 	return false
 }
 
+func checkBootstrapImage(jobName, imageName string) error {
+	if strings.Contains(imageName, "bootstrap") {
+		return fmt.Errorf("job %s: image %s has been decommissioned", jobName, imageName)
+	}
+	return nil
+}
+
 func checkScenarioArgs(jobName, imageName string, args []string) error {
 	// env files/scenarios validation
 	scenarioArgs := false
@@ -809,24 +813,12 @@ func checkScenarioArgs(jobName, imageName string, args []string) error {
 		}
 	}
 
-	if scenario == "" {
-		if !scenarioArgs {
-			if strings.Contains(imageName, "kubekins-e2e") ||
-				strings.Contains(imageName, "bootstrap") ||
-				strings.Contains(imageName, "gcloud-in-go") {
-				return fmt.Errorf("job %s: image %s uses bootstrap.py and need scenario args", jobName, imageName)
-			}
-			return nil
-		}
-
-	} else {
-		if _, err := os.Stat(fmt.Sprintf("../../../scenarios/%s.py", scenario)); err != nil {
-			return fmt.Errorf("job %s: scenario %s does not exist: %s", jobName, scenario, err)
-		}
-
-		if !scenarioArgs {
-			return fmt.Errorf("job %s: set --scenario=%s and will need scenario args", jobName, scenario)
-		}
+	if scenario != "" {
+		return fmt.Errorf("job %s: scenario (%s) based bootstrap.py jobs are not supported",
+			jobName, scenario)
+	}
+	if scenarioArgs {
+		return fmt.Errorf("job %s: scenario based bootstrap.py jobs are not supported", jobName)
 	}
 
 	// shared build args
@@ -956,6 +948,14 @@ func checkScenarioArgs(jobName, imageName string, args []string) error {
 	return nil
 }
 
+func TestPreSubmitPathAlias(t *testing.T) {
+	for _, job := range c.AllStaticPresubmits([]string{"kubernetes/kubernetes"}) {
+		if job.PathAlias != "k8s.io/kubernetes" {
+			t.Errorf("Invalid PathAlias (%s) in job %s for kubernetes/kubernetes repository", job.Name, job.PathAlias)
+		}
+	}
+}
+
 // TestValidScenarioArgs makes sure all scenario args in job configs are valid
 func TestValidScenarioArgs(t *testing.T) {
 	for _, job := range c.AllStaticPresubmits(nil) {
@@ -963,6 +963,9 @@ func TestValidScenarioArgs(t *testing.T) {
 			if err := checkScenarioArgs(job.Name, job.Spec.Containers[0].Image, job.Spec.Containers[0].Args); err != nil {
 				t.Errorf("Invalid Scenario Args : %s", err)
 			}
+		}
+		if err := checkBootstrapImage(job.Name, job.Spec.Containers[0].Image); err != nil {
+			t.Errorf("Invalid image : %s", err)
 		}
 	}
 
@@ -972,6 +975,9 @@ func TestValidScenarioArgs(t *testing.T) {
 				t.Errorf("Invalid Scenario Args : %s", err)
 			}
 		}
+		if err := checkBootstrapImage(job.Name, job.Spec.Containers[0].Image); err != nil {
+			t.Errorf("Invalid image : %s", err)
+		}
 	}
 
 	for _, job := range c.AllPeriodics() {
@@ -979,6 +985,9 @@ func TestValidScenarioArgs(t *testing.T) {
 			if err := checkScenarioArgs(job.Name, job.Spec.Containers[0].Image, job.Spec.Containers[0].Args); err != nil {
 				t.Errorf("Invalid Scenario Args : %s", err)
 			}
+		}
+		if err := checkBootstrapImage(job.Name, job.Spec.Containers[0].Image); err != nil {
+			t.Errorf("Invalid image : %s", err)
 		}
 	}
 }
@@ -1082,7 +1091,7 @@ func TestKubernetesMergeBlockingJobsCIPolicy(t *testing.T) {
 		// job Pod must qualify for Guaranteed QoS
 		errs := verifyPodQOSGuaranteed(job.Spec, true)
 		if !isCritical(job.Cluster) {
-			errs = append(errs, fmt.Errorf("must run in cluster: k8s-infra-prow-build, found: %v", job.Cluster))
+			errs = append(errs, fmt.Errorf("must run in cluster: k8s-infra-prow-build or eks-prow-build-cluster, found: %v", job.Cluster))
 		}
 		branches := job.Branches
 		if len(errs) > 0 {
@@ -1100,7 +1109,7 @@ func TestClusterName(t *testing.T) {
 	jobs := allStaticJobs()
 	for _, job := range jobs {
 		// Useful for identifiying how many jobs are running a specific cluster by omitting from this list
-		validClusters := []string{"default", "test-infra-trusted", "k8s-infra-prow-build", "k8s-infra-prow-build-trusted", "eks-prow-build-cluster"}
+		validClusters := []string{"default", "test-infra-trusted", "k8s-infra-kops-prow-build", "k8s-infra-prow-build", "k8s-infra-prow-build-trusted", "eks-prow-build-cluster"}
 		if !slices.Contains(validClusters, job.Cluster) || job.Cluster == "" {
 			err := fmt.Errorf("must run in one of these clusters: %v, found: %v", validClusters, job.Cluster)
 			t.Errorf("%v: %v", job.Name, err)
@@ -1120,7 +1129,7 @@ func TestKubernetesReleaseBlockingJobsCIPolicy(t *testing.T) {
 		}
 		// job Pod must qualify for Guaranteed QoS
 		errs := verifyPodQOSGuaranteed(job.Spec, true)
-		if !isCritical(job.Cluster) && !isEKSCluster(job.Cluster) {
+		if !isCritical(job.Cluster) {
 			errs = append(errs, fmt.Errorf("must run in cluster: k8s-infra-prow-build or eks-prow-build-cluster, found: %v", job.Cluster))
 		}
 		if len(errs) > 0 {
@@ -1137,7 +1146,7 @@ func TestK8sInfraProwBuildJobsCIPolicy(t *testing.T) {
 	jobsToFix := 0
 	jobs := allStaticJobs()
 	for _, job := range jobs {
-		if job.Spec == nil || (!isCritical(job.Cluster) && !isEKSCluster(job.Cluster)) {
+		if job.Spec == nil || !isCritical(job.Cluster) {
 			continue
 		}
 		// job Pod must qualify for Guaranteed QoS
@@ -1167,8 +1176,8 @@ func TestSigReleaseMasterBlockingOrInformingJobsMustUseFastBuilds(t *testing.T) 
 		for _, arg := range job.Spec.Containers[0].Args {
 			if strings.HasPrefix(arg, "--extract=") {
 				extract = strings.TrimPrefix(arg, "--extract=")
-				if extract != "ci/latest-fast" {
-					errs = append(errs, fmt.Errorf("release-master-blocking e2e jobs must use --extract=ci/latest-fast, found --extract=%s instead", extract))
+				if extract != "ci/fast/latest-fast" {
+					errs = append(errs, fmt.Errorf("release-master-blocking e2e jobs must use --extract=ci/fast/latest-fast, found --extract=%s instead", extract))
 				}
 			}
 		}
@@ -1213,7 +1222,7 @@ func extractUsesReleaseBucket(extract string) bool {
 }
 
 // To help with migration to community-owned buckets for CI and release artifacts:
-// - jobs using --extract=ci/latest-fast MUST pull from gs://k8s-release-dev
+// - jobs using --extract=ci/fast/latest-fast MUST pull from gs://k8s-release-dev
 // - release-blocking jobs using --extract=ci/*  MUST from pull gs://k8s-release-dev
 // TODO(https://github.com/kubernetes/k8s.io/issues/846): switch from SHOULD to MUST once all jobs migrated
 // - jobs using --extract=ci/* SHOULD pull from gs://k8s-release-dev
@@ -1251,7 +1260,7 @@ func TestKubernetesE2eJobsMustExtractFromK8sInfraBuckets(t *testing.T) {
 				if extractUsesCIBucket(extract) && ciBucket != expectedCIBucket {
 					needsFix = true
 					jobDesc := "jobs"
-					fail = extract == "ci/latest-fast"
+					fail = extract == "ci/fast/latest-fast"
 					if isKubernetesReleaseBlocking(job) {
 						fail = true
 						jobDesc = "release-blocking jobs"

@@ -70,7 +70,7 @@ presubmits:
     run_if_changed: '^(config/prow/(config|plugins).yaml$|config/jobs/.*.yaml$)'
     spec:
       containers:
-      - image: gcr.io/k8s-prow/checkconfig:v20230908-12387e8f71
+      - image: gcr.io/k8s-prow/checkconfig:v20240228-d64ece9e05
         command:
         - checkconfig
         args:
@@ -78,39 +78,6 @@ presubmits:
         - --job-config-path=config/jobs
         - --plugin-config=config/prow/plugins.yaml
         - --strict
-        - --warnings=mismatched-tide-lenient
-        - --warnings=tide-strict-branch
-        - --warnings=needs-ok-to-test
-        - --warnings=validate-owners
-        - --warnings=missing-trigger
-        - --warnings=validate-urls
-        - --warnings=unknown-fields
-        - --warnings=duplicate-job-refs
-        - --warnings=unknown-fields-all
-        resources:
-          requests:
-            cpu: "1"
-            memory: "2Gi"
-          limits:
-            cpu: "1"
-            memory: "2Gi"
-    annotations:
-      testgrid-dashboards: presubmits-test-infra
-  - name: pull-test-infra-prow-checkconfig-loose
-    cluster: eks-prow-build-cluster
-    optional: true
-    decorate: true
-    skip_report: true
-    run_if_changed: '^(config/prow/(config|plugins).yaml$|config/jobs/.*.yaml$)'
-    spec:
-      containers:
-      - image: gcr.io/k8s-prow/checkconfig:v20230908-12387e8f71
-        command:
-        - checkconfig
-        args:
-        - --config-path=config/prow/config.yaml
-        - --job-config-path=config/jobs
-        - --plugin-config=config/prow/plugins.yaml
         - --warnings=mismatched-tide-lenient
         - --warnings=tide-strict-branch
         - --warnings=needs-ok-to-test
@@ -143,7 +110,7 @@ presubmits:
       preset-kind-volume-mounts: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-test-infra
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-test-infra
         command:
         - runner.sh
         args:
@@ -177,7 +144,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-test-infra
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-test-infra
         command:
         - runner.sh
         args:
@@ -191,10 +158,10 @@ presubmits:
           privileged: true
         resources:
           requests:
-            cpu: "4"
+            cpu: "8"
             memory: "8Gi"
           limits:
-            cpu: "4"
+            cpu: "8"
             memory: "8Gi"
     annotations:
       testgrid-dashboards: presubmits-test-infra
@@ -210,7 +177,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-test-infra
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-test-infra
         command:
         - runner.sh
         args:
@@ -221,10 +188,10 @@ presubmits:
           privileged: true
         resources:
           requests:
-            cpu: "4"
+            cpu: "8"
             memory: "8Gi"
           limits:
-            cpu: "4"
+            cpu: "8"
             memory: "8Gi"
     annotations:
       testgrid-dashboards: presubmits-test-infra
@@ -240,7 +207,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-test-infra
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-test-infra
         command:
         - runner.sh
         args:
@@ -274,7 +241,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-test-infra
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-test-infra
         command:
         - runner.sh
         args:
@@ -285,10 +252,10 @@ presubmits:
           privileged: true
         resources:
           requests:
-            cpu: "4"
+            cpu: "8"
             memory: "8Gi"
           limits:
-            cpu: "4"
+            cpu: "8"
             memory: "8Gi"
     annotations:
       testgrid-dashboards: presubmits-test-infra
@@ -304,7 +271,7 @@ presubmits:
       preset-dind-enabled: "true"
     spec:
       containers:
-      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-test-infra
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-test-infra
         command:
         - runner.sh
         args:

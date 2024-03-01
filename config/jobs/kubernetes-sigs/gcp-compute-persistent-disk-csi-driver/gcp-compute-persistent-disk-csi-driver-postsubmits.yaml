@@ -1,20 +1,24 @@
 periodics:
 - name: ci-gcp-compute-persistent-disk-csi-driver-release-staging-k8s-master-integration
+  cluster: k8s-infra-prow-build
   interval: 4h
   labels:
     preset-service-account: "true"
     preset-dind-enabled: "true"
+  decorate: true
+  decoration_config:
+    timeout: 180m # Minutes (120m runs consistently time out)
+  extra_refs:
+  - org: kubernetes-sigs
+    repo: gcp-compute-persistent-disk-csi-driver
+    base_ref: master
+    path_alias: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
+      command:
+      - runner.sh
       args:
-      - "--repo=sigs.k8s.io/gcp-compute-persistent-disk-csi-driver"
-      - "--root=/go/src"
-      - "--upload=gs://kubernetes-jenkins/logs"
-      - "--clean"
-      - "--timeout=180" # Minutes (120m runs consistently time out)
-      - "--scenario=execute"
-      - "--" # end bootstrap args, scenario args below
       - "test/run-k8s-integration-ci.sh"
       env:
       - name: GCE_PD_OVERLAY_NAME
@@ -25,33 +29,37 @@ periodics:
       securityContext:
         privileged: true
       resources:
+        limits:
+          cpu: 2
+          memory: "6Gi"
         requests:
-          # these are both a bit below peak usage during build
-          # this is mostly for building kubernetes
-          memory: "9000Mi"
-          # during the tests more like 3-20m is used
-          cpu: 2000m
+          cpu: 2
+          memory: "6Gi"
   annotations:
     testgrid-dashboards: provider-gcp-compute-persistent-disk-csi-driver
     testgrid-tab-name: Kubernetes Master Driver Latest Release Candidate
     testgrid-alert-email: gke-managed-storage-alerts@google.com
     description: Kubernetes Integration tests for Kubernetes Master branch, Driver latest Release Candidate, and Stable Sidecars. Used to test release candidates when a new release is being cut.
 - name: ci-gcp-compute-persistent-disk-csi-driver-latest-k8s-master-integration
+  cluster: k8s-infra-prow-build
   interval: 4h
   labels:
     preset-service-account: "true"
     preset-dind-enabled: "true"
+  decorate: true
+  decoration_config:
+    timeout: 180m # Minutes (120m runs consistently time out)
+  extra_refs:
+  - org: kubernetes-sigs
+    repo: gcp-compute-persistent-disk-csi-driver
+    base_ref: master
+    path_alias: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
+      command:
+      - runner.sh
       args:
-      - "--repo=sigs.k8s.io/gcp-compute-persistent-disk-csi-driver"
-      - "--root=/go/src"
-      - "--upload=gs://kubernetes-jenkins/logs"
-      - "--clean"
-      - "--timeout=180" # Minutes (120m times out)
-      - "--scenario=execute"
-      - "--" # end bootstrap args, scenario args below
       - "test/run-k8s-integration-ci.sh"
       env:
       - name: GCE_PD_OVERLAY_NAME
@@ -62,33 +70,38 @@ periodics:
       securityContext:
         privileged: true
       resources:
+        limits:
+          cpu: 2
+          memory: "6Gi"
         requests:
-          # these are both a bit below peak usage during build
-          # this is mostly for building kubernetes
-          memory: "9000Mi"
-          # during the tests more like 3-20m is used
-          cpu: 2000m
+          cpu: 2
+          memory: "6Gi"
   annotations:
     testgrid-dashboards: provider-gcp-compute-persistent-disk-csi-driver
     testgrid-tab-name: Kubernetes Master Driver Latest
     testgrid-alert-email: gke-managed-storage-alerts@google.com
     description: Kubernetes Integration tests for Kubernetes Master branch, Driver latest build, and Stable Sidecars
 - name: ci-gcp-compute-persistent-disk-csi-driver-latest-k8s-master-integration-canary-sidecars
+  cluster: k8s-infra-prow-build
   interval: 4h
   labels:
     preset-service-account: "true"
     preset-dind-enabled: "true"
+  decorate: true
+  decoration_config:
+    timeout: 180m
+  extra_refs:
+  - org: kubernetes-sigs
+    repo: gcp-compute-persistent-disk-csi-driver
+    base_ref: master
+    path_alias: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
+    workdir: true
   spec:
     containers:
-    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20230727-ea685f8747-master
+    - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20240223-1ded72f317-master
+      command:
+      - runner.sh
       args:
-      - "--repo=sigs.k8s.io/gcp-compute-persistent-disk-csi-driver"
-      - "--root=/go/src"
-      - "--upload=gs://kubernetes-jenkins/logs"
-      - "--clean"
-      - "--timeout=180" # Minutes (120m times out)
-      - "--scenario=execute"
-      - "--" # end bootstrap args, scenario args below
       - "test/run-k8s-integration-ci.sh"
       env:
       - name: GCE_PD_OVERLAY_NAME
@@ -99,12 +112,12 @@ periodics:
       securityContext:
         privileged: true
       resources:
+        limits:
+          cpu: 2
+          memory: "6Gi"
         requests:
-          # these are both a bit below peak usage during build
-          # this is mostly for building kubernetes
-          memory: "9000Mi"
-          # during the tests more like 3-20m is used
-          cpu: 2000m
+          cpu: 2
+          memory: "6Gi"
   annotations:
     testgrid-dashboards: provider-gcp-compute-persistent-disk-csi-driver
     testgrid-tab-name: Kubernetes Master Driver Latest Canary Sidecars
