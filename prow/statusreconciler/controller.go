@@ -242,10 +242,11 @@ func (c *Controller) triggerNewPresubmits(addedPresubmits map[string][]config.Pr
 				continue
 			}
 			// we want to appropriately trigger and skip from the set of identified presubmits that were
-			// added. we know all of the presubmits we are filtering need to be forced to run, so we can
-			// enforce that with a custom filter
+			// added. if a run_if_changed job has its regexp changed we should check PRs against the new regexp and
+			// trigger if needed instead of forcing the job to run on all PRs. so the default behavior of the filter need to be false.
+			// This pr https://github.com/kubernetes/test-infra/pull/12696#discussion_r284934476 led to this issue.
 			filter := pjutil.NewArbitraryFilter(func(p config.Presubmit) (shouldRun bool, forcedToRun bool, defaultBehavior bool) {
-				return true, false, true
+				return true, false, false
 			}, "inline-filter")
 			org, repo, number, branch := pr.Base.Repo.Owner.Login, pr.Base.Repo.Name, pr.Number, pr.Base.Ref
 			changes := config.NewGitHubDeferredChangedFilesProvider(c.githubClient, org, repo, number)
